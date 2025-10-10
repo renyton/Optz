@@ -1,0 +1,5 @@
+{
+  "name": "Grupo Optimize Valuation Calculator",
+  "description": "A comprehensive and interactive Discounted Cash Flow (DCF) valuation calculator. Users can input financial data to project free cash flows and determine the total valuation of a company.",
+  "requestFramePermissions": []
+}
