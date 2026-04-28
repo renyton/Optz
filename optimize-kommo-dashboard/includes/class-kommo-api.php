@@ -30,7 +30,7 @@ class Optimize_Kommo_API
 
     public static function get_redirect_uri()
     {
-        return admin_url('admin.php?page=optimize-kommo-dashboard&optimize_kommo_oauth=callback');
+        return admin_url('admin.php?page=optimize-kommo-dashboard&optimize_kommo_oauth_callback=1');
     }
 
     public static function get_authorization_url($state)
@@ -45,6 +45,7 @@ class Optimize_Kommo_API
                 'client_id'     => $config['client_id'],
                 'state'         => $state,
                 'response_type' => 'code',
+                'mode'          => 'popup',
                 'redirect_uri'  => self::get_redirect_uri(),
             ],
             '',
@@ -52,7 +53,7 @@ class Optimize_Kommo_API
             PHP_QUERY_RFC3986
         );
 
-        return self::get_base_url($config['subdomain']) . '/oauth?' . $query;
+        return 'https://www.kommo.com/oauth?' . $query;
     }
 
     private static function save_tokens($payload)

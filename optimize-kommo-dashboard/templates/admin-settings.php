@@ -13,19 +13,31 @@
         <table class="form-table">
             <tr>
                 <th><label for="optimize_kommo_subdomain">Subdomínio Kommo</label></th>
-                <td><input type="text" id="optimize_kommo_subdomain" name="optimize_kommo_subdomain" value="<?php echo esc_attr(get_option('optimize_kommo_subdomain', '')); ?>" class="regular-text" /></td>
+                <td>
+                    <input type="text" id="optimize_kommo_subdomain" name="optimize_kommo_subdomain" value="<?php echo esc_attr(get_option('optimize_kommo_subdomain', '')); ?>" class="regular-text" />
+                    <p class="description">Exemplo: se sua URL for https://optzmarketing.kommo.com, informe apenas optzmarketing.</p>
+                </td>
             </tr>
             <tr>
-                <th><label for="optimize_kommo_client_id">Client ID (OAuth)</label></th>
-                <td><input type="text" id="optimize_kommo_client_id" name="optimize_kommo_client_id" value="<?php echo esc_attr(get_option('optimize_kommo_client_id', '')); ?>" class="regular-text" /></td>
+                <th><label for="optimize_kommo_client_id">ID de integração</label></th>
+                <td>
+                    <input type="text" id="optimize_kommo_client_id" name="optimize_kommo_client_id" value="<?php echo esc_attr(get_option('optimize_kommo_client_id', '')); ?>" class="regular-text" />
+                    <p class="description">Copie este valor da aba Chaves e escopos da integração criada na Kommo.</p>
+                </td>
             </tr>
             <tr>
-                <th><label for="optimize_kommo_client_secret">Client Secret (OAuth)</label></th>
-                <td><input type="password" id="optimize_kommo_client_secret" name="optimize_kommo_client_secret" value="<?php echo esc_attr(get_option('optimize_kommo_client_secret', '')); ?>" class="regular-text" autocomplete="new-password" /></td>
+                <th><label for="optimize_kommo_client_secret">Chave secreta</label></th>
+                <td>
+                    <input type="password" id="optimize_kommo_client_secret" name="optimize_kommo_client_secret" value="<?php echo esc_attr(get_option('optimize_kommo_client_secret', '')); ?>" class="regular-text" autocomplete="new-password" />
+                    <p class="description">Clique em Gerar nova chave secreta na Kommo e cole o valor aqui.</p>
+                </td>
             </tr>
             <tr>
-                <th>Redirect URI</th>
-                <td><code><?php echo esc_html(Optimize_Kommo_API::get_redirect_uri()); ?></code></td>
+                <th>URL de redirecionamento</th>
+                <td>
+                    <code><?php echo esc_html(Optimize_Kommo_API::get_redirect_uri()); ?></code>
+                    <p class="description">Copie esta URL e cole no campo URL de redirecionamento da integração na Kommo.</p>
+                </td>
             </tr>
             <tr>
                 <th><label for="optimize_kommo_interval">Intervalo de atualização (minutos)</label></th>

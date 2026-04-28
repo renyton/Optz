@@ -87,8 +87,9 @@ class Optimize_Kommo_Admin
         }
 
         $action = isset($_GET['optimize_kommo_oauth']) ? sanitize_text_field(wp_unslash($_GET['optimize_kommo_oauth'])) : '';
+        $is_callback = isset($_GET['optimize_kommo_oauth_callback']);
 
-        if ('callback' === $action) {
+        if ($is_callback) {
             self::handle_oauth_callback();
             return;
         }
