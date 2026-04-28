@@ -8,6 +8,15 @@
     <?php if (! empty($_GET['oauth_success'])) : ?>
         <div class="notice notice-success"><p><?php esc_html_e('OAuth conectado com sucesso.', 'optimize-kommo-dashboard'); ?></p></div>
     <?php endif; ?>
+    <?php if (! empty($_GET['viewer_error'])) : ?>
+        <div class="notice notice-error"><p><?php echo esc_html('Usuários dashboard: ' . sanitize_text_field((string) $_GET['viewer_error'])); ?></p></div>
+    <?php endif; ?>
+    <?php if (! empty($_GET['viewer_success'])) : ?>
+        <div class="notice notice-success"><p><?php echo esc_html('Usuários dashboard: ' . sanitize_text_field((string) $_GET['viewer_success'])); ?></p></div>
+    <?php endif; ?>
+    <?php if (! empty($_GET['viewer_password']) && ! empty($_GET['viewer_user'])) : ?>
+        <div class="notice notice-warning"><p><?php echo esc_html('Nova senha de ' . sanitize_text_field((string) $_GET['viewer_user']) . ': ' . sanitize_text_field((string) $_GET['viewer_password'])); ?></p></div>
+    <?php endif; ?>
 
     <form method="post" action="options.php">
         <?php settings_fields('optimize_kommo_settings'); ?>
@@ -82,6 +91,65 @@
         <button type="button" class="button button-primary" id="optimize-kommo-sync-now"><?php esc_html_e('Sincronizar agora', 'optimize-kommo-dashboard'); ?></button>
         <span id="optimize-kommo-sync-feedback"></span>
     </p>
+
+    <h2><?php esc_html_e('Acesso ao dashboard (usuário/senha)', 'optimize-kommo-dashboard'); ?></h2>
+    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+        <input type="hidden" name="action" value="optimize_kommo_create_viewer" />
+        <?php wp_nonce_field('optimize_kommo_create_viewer'); ?>
+        <table class="form-table">
+            <tr>
+                <th><label for="viewer_name">Nome</label></th>
+                <td><input type="text" id="viewer_name" name="viewer_name" class="regular-text" /></td>
+            </tr>
+            <tr>
+                <th><label for="viewer_email">E-mail</label></th>
+                <td><input type="email" id="viewer_email" name="viewer_email" class="regular-text" required /></td>
+            </tr>
+            <tr>
+                <th><label for="viewer_login">Login</label></th>
+                <td><input type="text" id="viewer_login" name="viewer_login" class="regular-text" required /></td>
+            </tr>
+            <tr>
+                <th><label for="viewer_password">Senha</label></th>
+                <td><input type="text" id="viewer_password" name="viewer_password" class="regular-text" required /></td>
+            </tr>
+        </table>
+        <?php submit_button(__('Criar usuário visualizador', 'optimize-kommo-dashboard')); ?>
+    </form>
+
+    <h3><?php esc_html_e('Usuários com acesso', 'optimize-kommo-dashboard'); ?></h3>
+    <table class="widefat striped">
+        <thead><tr><th>ID</th><th>Nome</th><th>Login</th><th>E-mail</th><th>Roles</th><th>Ações</th></tr></thead>
+        <tbody>
+            <?php if (empty($dashboard_users)) : ?>
+                <tr><td colspan="6">Nenhum usuário.</td></tr>
+            <?php else : foreach ($dashboard_users as $user) : ?>
+                <tr>
+                    <td><?php echo esc_html((string) $user->ID); ?></td>
+                    <td><?php echo esc_html((string) $user->display_name); ?></td>
+                    <td><?php echo esc_html((string) $user->user_login); ?></td>
+                    <td><?php echo esc_html((string) $user->user_email); ?></td>
+                    <td><?php echo esc_html(implode(', ', (array) $user->roles)); ?></td>
+                    <td>
+                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;">
+                            <input type="hidden" name="action" value="optimize_kommo_reset_viewer_password" />
+                            <input type="hidden" name="user_id" value="<?php echo esc_attr((string) $user->ID); ?>" />
+                            <?php wp_nonce_field('optimize_kommo_reset_viewer_password'); ?>
+                            <button class="button" type="submit">Resetar senha</button>
+                        </form>
+                        <?php if (! in_array('administrator', (array) $user->roles, true)) : ?>
+                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;">
+                                <input type="hidden" name="action" value="optimize_kommo_remove_viewer_access" />
+                                <input type="hidden" name="user_id" value="<?php echo esc_attr((string) $user->ID); ?>" />
+                                <?php wp_nonce_field('optimize_kommo_remove_viewer_access'); ?>
+                                <button class="button button-link-delete" type="submit">Remover acesso</button>
+                            </form>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            <?php endforeach; endif; ?>
+        </tbody>
+    </table>
 
     <h2><?php esc_html_e('Logs recentes', 'optimize-kommo-dashboard'); ?></h2>
     <table class="widefat striped">

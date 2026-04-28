@@ -26,8 +26,11 @@ class Optimize_Kommo_Dashboard
     public static function init()
     {
         add_shortcode('optimize_kommo_dashboard', [__CLASS__, 'render_shortcode']);
+        add_shortcode('optimize_kommo_login', [__CLASS__, 'render_login_shortcode']);
         add_action('wp_enqueue_scripts', [__CLASS__, 'enqueue']);
         add_action('wp_ajax_optimize_kommo_get_dashboard_data', [__CLASS__, 'ajax_data']);
+        add_action('admin_init', [__CLASS__, 'block_viewer_admin_access']);
+        add_action('init', [__CLASS__, 'handle_login_submission']);
     }
 
     public static function enqueue()
@@ -52,20 +55,18 @@ class Optimize_Kommo_Dashboard
 
     public static function user_can_access()
     {
-        if (current_user_can('manage_options')) {
-            return true;
-        }
-
-        $allowed = (string) get_option('optimize_kommo_authorized_users', '');
-        $ids = array_filter(array_map('absint', array_map('trim', explode(',', $allowed))));
-
-        return in_array(get_current_user_id(), $ids, true);
+        return current_user_can('access_optimize_dashboard') || current_user_can('manage_options');
     }
 
     public static function render_shortcode()
     {
-        if (! is_user_logged_in() || ! self::user_can_access()) {
-            return '<p>' . esc_html__('Você não tem permissão para visualizar este dashboard.', 'optimize-kommo-dashboard') . '</p>';
+        if (! is_user_logged_in()) {
+            wp_safe_redirect(self::get_login_page_url());
+            exit;
+        }
+
+        if (! self::user_can_access()) {
+            return '<p>' . esc_html__('Acesso não autorizado.', 'optimize-kommo-dashboard') . '</p>';
         }
 
         wp_enqueue_style('optimize-kommo-dashboard-css');
@@ -77,6 +78,7 @@ class Optimize_Kommo_Dashboard
             [
                 'ajaxUrl' => admin_url('admin-ajax.php'),
                 'nonce'   => wp_create_nonce('optimize_kommo_dashboard_nonce'),
+                'logoutUrl' => wp_logout_url(self::get_login_page_url()),
             ]
         );
 
@@ -84,6 +86,119 @@ class Optimize_Kommo_Dashboard
         include OPTIMIZE_KOMMO_DASHBOARD_PATH . 'templates/dashboard.php';
 
         return ob_get_clean();
+    }
+
+    public static function render_login_shortcode()
+    {
+        wp_enqueue_style('optimize-kommo-dashboard-css');
+
+        if (is_user_logged_in() && self::user_can_access()) {
+            wp_safe_redirect(self::get_dashboard_page_url());
+            exit;
+        }
+
+        $error_key = sanitize_text_field((string) ($_GET['okd_login_error'] ?? ''));
+        $error_map = [
+            'invalid_nonce' => __('Sessão inválida. Tente novamente.', 'optimize-kommo-dashboard'),
+            'empty_fields' => __('Informe usuário/e-mail e senha.', 'optimize-kommo-dashboard'),
+            'invalid_login' => __('Usuário ou senha inválidos.', 'optimize-kommo-dashboard'),
+            'not_allowed' => __('Seu usuário não possui acesso ao dashboard.', 'optimize-kommo-dashboard'),
+        ];
+        $message = $error_map[$error_key] ?? '';
+
+        ob_start();
+        ?>
+        <div class="okd-login-wrap">
+            <form method="post" class="okd-login-form">
+                <h2><?php esc_html_e('Login Dashboard Comercial', 'optimize-kommo-dashboard'); ?></h2>
+                <?php if ('' !== $message) : ?>
+                    <p class="okd-login-error"><?php echo esc_html($message); ?></p>
+                <?php endif; ?>
+                <input type="hidden" name="okd_login_action" value="1" />
+                <?php wp_nonce_field('okd_login_nonce_action', 'okd_login_nonce'); ?>
+                <p>
+                    <label for="okd_login_username"><?php esc_html_e('Usuário ou e-mail', 'optimize-kommo-dashboard'); ?></label>
+                    <input type="text" id="okd_login_username" name="okd_login_username" required />
+                </p>
+                <p>
+                    <label for="okd_login_password"><?php esc_html_e('Senha', 'optimize-kommo-dashboard'); ?></label>
+                    <input type="password" id="okd_login_password" name="okd_login_password" required />
+                </p>
+                <p><button type="submit" class="button button-primary"><?php esc_html_e('Entrar', 'optimize-kommo-dashboard'); ?></button></p>
+            </form>
+        </div>
+        <?php
+
+        return ob_get_clean();
+    }
+
+    public static function handle_login_submission()
+    {
+        if ('POST' !== strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET')) {
+            return;
+        }
+
+        if (empty($_POST['okd_login_action'])) {
+            return;
+        }
+
+        if (! isset($_POST['okd_login_nonce']) || ! wp_verify_nonce(sanitize_text_field((string) $_POST['okd_login_nonce']), 'okd_login_nonce_action')) {
+            wp_safe_redirect(add_query_arg('okd_login_error', 'invalid_nonce', self::get_login_page_url()));
+            exit;
+        }
+
+        $username = sanitize_text_field((string) ($_POST['okd_login_username'] ?? ''));
+        $password = (string) ($_POST['okd_login_password'] ?? '');
+        if ('' === $username || '' === $password) {
+            wp_safe_redirect(add_query_arg('okd_login_error', 'empty_fields', self::get_login_page_url()));
+            exit;
+        }
+
+        if (is_email($username)) {
+            $user = get_user_by('email', $username);
+            if ($user instanceof WP_User) {
+                $username = $user->user_login;
+            }
+        }
+
+        $signed = wp_signon(
+            [
+                'user_login' => $username,
+                'user_password' => $password,
+                'remember' => true,
+            ],
+            is_ssl()
+        );
+
+        if (is_wp_error($signed)) {
+            wp_safe_redirect(add_query_arg('okd_login_error', 'invalid_login', self::get_login_page_url()));
+            exit;
+        }
+
+        if (! user_can($signed, 'access_optimize_dashboard') && ! user_can($signed, 'manage_options')) {
+            wp_logout();
+            wp_safe_redirect(add_query_arg('okd_login_error', 'not_allowed', self::get_login_page_url()));
+            exit;
+        }
+
+        wp_safe_redirect(self::get_dashboard_page_url());
+        exit;
+    }
+
+    public static function block_viewer_admin_access()
+    {
+        if (! is_user_logged_in() || wp_doing_ajax()) {
+            return;
+        }
+
+        if (current_user_can('manage_options')) {
+            return;
+        }
+
+        if (current_user_can('access_optimize_dashboard')) {
+            wp_safe_redirect(self::get_dashboard_page_url());
+            exit;
+        }
     }
 
     public static function ajax_data()
@@ -380,5 +495,37 @@ class Optimize_Kommo_Dashboard
         }
 
         return $ordered_map;
+    }
+
+    public static function get_login_page_url()
+    {
+        $page_id = self::find_page_with_shortcode('optimize_kommo_login');
+        if ($page_id > 0) {
+            return get_permalink($page_id);
+        }
+
+        return wp_login_url();
+    }
+
+    public static function get_dashboard_page_url()
+    {
+        $page_id = self::find_page_with_shortcode('optimize_kommo_dashboard');
+        if ($page_id > 0) {
+            return get_permalink($page_id);
+        }
+
+        return home_url('/');
+    }
+
+    private static function find_page_with_shortcode($shortcode)
+    {
+        $pages = get_pages(['post_status' => ['publish', 'private']]);
+        foreach ($pages as $page) {
+            if (isset($page->post_content) && false !== strpos((string) $page->post_content, '[' . $shortcode . ']')) {
+                return (int) $page->ID;
+            }
+        }
+
+        return 0;
     }
 }

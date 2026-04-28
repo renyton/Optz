@@ -12,6 +12,9 @@ class Optimize_Kommo_Admin
         add_action('admin_init', [__CLASS__, 'register_settings']);
         add_action('admin_post_optimize_kommo_oauth_start', [__CLASS__, 'handle_oauth_start']);
         add_action('admin_post_optimize_kommo_oauth_callback', [__CLASS__, 'handle_oauth_callback']);
+        add_action('admin_post_optimize_kommo_create_viewer', [__CLASS__, 'handle_create_viewer']);
+        add_action('admin_post_optimize_kommo_reset_viewer_password', [__CLASS__, 'handle_reset_viewer_password']);
+        add_action('admin_post_optimize_kommo_remove_viewer_access', [__CLASS__, 'handle_remove_viewer_access']);
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue']);
         add_action('update_option_optimize_kommo_interval', [__CLASS__, 'on_interval_update'], 10, 2);
     }
@@ -93,8 +96,102 @@ class Optimize_Kommo_Admin
         $last_sync = get_option('optimize_kommo_last_sync', __('Nunca', 'optimize-kommo-dashboard'));
         $oauth_callback = admin_url('admin-post.php?action=optimize_kommo_oauth_callback');
         $oauth_debug = get_option('optimize_kommo_oauth_debug', []);
+        $dashboard_users = get_users(
+            [
+                'role__in' => ['optimize_dashboard_viewer', 'administrator'],
+                'orderby' => 'display_name',
+                'order' => 'ASC',
+            ]
+        );
 
         include OPTIMIZE_KOMMO_DASHBOARD_PATH . 'templates/admin-settings.php';
+    }
+
+    public static function handle_create_viewer()
+    {
+        if (! current_user_can('manage_options')) {
+            wp_die(__('Sem permissão.', 'optimize-kommo-dashboard'));
+        }
+
+        check_admin_referer('optimize_kommo_create_viewer');
+
+        $name = sanitize_text_field((string) ($_POST['viewer_name'] ?? ''));
+        $email = sanitize_email((string) ($_POST['viewer_email'] ?? ''));
+        $login = sanitize_user((string) ($_POST['viewer_login'] ?? ''), true);
+        $password = (string) ($_POST['viewer_password'] ?? '');
+
+        if ('' === $login || '' === $email || '' === $password) {
+            wp_safe_redirect(add_query_arg('viewer_error', 'missing_fields', admin_url('admin.php?page=optimize-kommo-dashboard')));
+            exit;
+        }
+
+        $user_id = wp_insert_user(
+            [
+                'user_login' => $login,
+                'user_pass' => $password,
+                'user_email' => $email,
+                'display_name' => $name ?: $login,
+                'role' => 'optimize_dashboard_viewer',
+            ]
+        );
+
+        if (is_wp_error($user_id)) {
+            wp_safe_redirect(add_query_arg('viewer_error', rawurlencode($user_id->get_error_message()), admin_url('admin.php?page=optimize-kommo-dashboard')));
+            exit;
+        }
+
+        wp_safe_redirect(add_query_arg('viewer_success', 'created', admin_url('admin.php?page=optimize-kommo-dashboard')));
+        exit;
+    }
+
+    public static function handle_reset_viewer_password()
+    {
+        if (! current_user_can('manage_options')) {
+            wp_die(__('Sem permissão.', 'optimize-kommo-dashboard'));
+        }
+
+        check_admin_referer('optimize_kommo_reset_viewer_password');
+
+        $user_id = absint($_POST['user_id'] ?? 0);
+        $user = get_user_by('id', $user_id);
+        if (! $user instanceof WP_User) {
+            wp_safe_redirect(add_query_arg('viewer_error', 'user_not_found', admin_url('admin.php?page=optimize-kommo-dashboard')));
+            exit;
+        }
+
+        $new_password = wp_generate_password(12, false);
+        wp_set_password($new_password, $user_id);
+        clean_user_cache($user_id);
+
+        wp_safe_redirect(add_query_arg(['viewer_success' => 'password_reset', 'viewer_password' => rawurlencode($new_password), 'viewer_user' => rawurlencode($user->user_login)], admin_url('admin.php?page=optimize-kommo-dashboard')));
+        exit;
+    }
+
+    public static function handle_remove_viewer_access()
+    {
+        if (! current_user_can('manage_options')) {
+            wp_die(__('Sem permissão.', 'optimize-kommo-dashboard'));
+        }
+
+        check_admin_referer('optimize_kommo_remove_viewer_access');
+
+        $user_id = absint($_POST['user_id'] ?? 0);
+        $user = get_user_by('id', $user_id);
+        if (! $user instanceof WP_User) {
+            wp_safe_redirect(add_query_arg('viewer_error', 'user_not_found', admin_url('admin.php?page=optimize-kommo-dashboard')));
+            exit;
+        }
+
+        if (in_array('administrator', (array) $user->roles, true)) {
+            wp_safe_redirect(add_query_arg('viewer_error', 'cannot_remove_admin', admin_url('admin.php?page=optimize-kommo-dashboard')));
+            exit;
+        }
+
+        $user->remove_role('optimize_dashboard_viewer');
+        $user->set_role('subscriber');
+
+        wp_safe_redirect(add_query_arg('viewer_success', 'removed_access', admin_url('admin.php?page=optimize-kommo-dashboard')));
+        exit;
     }
 
     public static function handle_oauth_start()

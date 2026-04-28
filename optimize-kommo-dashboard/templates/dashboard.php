@@ -1,5 +1,8 @@
 <?php if (! defined('ABSPATH')) { exit; } ?>
 <div id="optimize-kommo-dashboard">
+    <div class="okd-topbar">
+        <a class="okd-btn-logout" href="<?php echo esc_url(wp_logout_url(Optimize_Kommo_Dashboard::get_login_page_url())); ?>">Sair</a>
+    </div>
     <div class="okd-surface okd-filters-bar">
         <div class="okd-filter">
             <label for="okd-date-start">Data inicial</label>
