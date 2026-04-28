@@ -51,15 +51,20 @@
     font-weight: 600;
 }
 
-.okd-filter input {
+.okd-filter input,
+.okd-filter select,
+.okd-chart-type {
     height: 40px;
     border: 1px solid var(--okd-border);
     border-radius: 10px;
     padding: 0 12px;
     font-size: 14px;
+    background: #fff;
 }
 
-.okd-filter input:focus {
+.okd-filter input:focus,
+.okd-filter select:focus,
+.okd-chart-type:focus {
     outline: none;
     border-color: var(--okd-primary);
     box-shadow: 0 0 0 3px var(--okd-primary-soft);
@@ -141,14 +146,39 @@
     padding: var(--okd-space-3);
 }
 
+.okd-chart-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--okd-space-2);
+    margin-bottom: 14px;
+}
+
 .okd-chart-card h3 {
-    margin: 0 0 14px;
+    margin: 0;
     font-size: 15px;
     font-weight: 700;
 }
 
 .okd-chart-card canvas {
     max-height: 320px;
+}
+
+.okd-chart-sheet {
+    display: none;
+    margin-top: 10px;
+}
+
+.okd-sheet-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.okd-sheet-table th,
+.okd-sheet-table td {
+    border: 1px solid var(--okd-border);
+    padding: 8px 10px;
+    font-size: 12px;
 }
 
 .okd-table-wrap {

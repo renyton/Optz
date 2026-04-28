@@ -1,5 +1,6 @@
 (function ($) {
     const charts = {};
+    const chartState = {};
     const CHART_COLORS = {
         bu: ['#2563eb', '#1d4ed8', '#1e40af', '#3730a3', '#4338ca', '#64748b'],
         origem: ['#06b6d4', '#0ea5e9', '#0891b2', '#14b8a6', '#64748b'],
@@ -46,6 +47,10 @@
             labels,
             data: labels.map((label) => map[label]),
         };
+    }
+
+    function safeChartIdToKey(chartId) {
+        return String(chartId || '').replace('okd-chart-', '');
     }
 
     function normalizeLabel(value) {
@@ -110,15 +115,32 @@
         const ds = toDataset(effectiveMap);
         const kind = chartKindById(id);
         const palette = CHART_COLORS[kind] || CHART_COLORS.day;
-        const isLine = id === 'okd-chart-day';
+        const selectedType = $(`.okd-chart-type[data-chart-id="${id}"]`).val() || (id === 'okd-chart-day' ? 'line' : 'bar');
+        const isLine = selectedType === 'line';
+        const isTable = selectedType === 'table';
         const barColors = ds.labels.map((_, i) => palette[i % palette.length]);
+        const sheetId = `okd-sheet-${safeChartIdToKey(id)}`;
+        const sheetEl = document.getElementById(sheetId);
+
+        chartState[id] = { title, map: effectiveMap, activePipeline };
 
         if (charts[id]) {
             charts[id].destroy();
+            delete charts[id];
+        }
+
+        if (sheetEl) {
+            sheetEl.style.display = isTable ? 'block' : 'none';
+            sheetEl.innerHTML = isTable ? renderSheetTable(ds.labels, ds.data) : '';
+        }
+
+        canvas.style.display = isTable ? 'none' : 'block';
+        if (isTable) {
+            return;
         }
 
         charts[id] = new Chart(canvas.getContext('2d'), {
-            type: isLine ? 'line' : 'bar',
+            type: selectedType,
             data: {
                 labels: ds.labels,
                 datasets: [{
@@ -155,6 +177,11 @@
         });
     }
 
+    function renderSheetTable(labels, data) {
+        const rows = labels.map((label, idx) => `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(data[idx])}</td></tr>`).join('');
+        return `<table class="okd-sheet-table"><thead><tr><th>Categoria</th><th>Quantidade</th></tr></thead><tbody>${rows || '<tr><td colspan="2">Sem dados</td></tr>'}</tbody></table>`;
+    }
+
     function summarizeMap(map) {
         const entries = Object.entries(map || {});
         if (!entries.length) return 'Sem dados';
@@ -181,7 +208,6 @@
             cardHtml('Leads desqualificados', cards.desqualificados, 'Leads encerrados sem potencial'),
             cardHtml('Reuniões agendadas', cards.agendados, 'Status com reunião marcada'),
             cardHtml('Acima de R$ 20M/ano', cards.acima_20m, 'Leads HIGH VALUE'),
-            cardHtml('Leads por BU', Object.keys(cards.por_bu || {}).length, summarizeMap(cards.por_bu)),
             cardHtml('Leads por origem', Object.keys(cards.por_origem || {}).length, summarizeMap(cards.por_origem)),
         ];
 
@@ -237,12 +263,38 @@
         };
     }
 
+    function renderFilterSelect(selector, values, selectedValue) {
+        const $select = $(selector);
+        if (!$select.length) return;
+
+        const current = selectedValue != null ? String(selectedValue) : String($select.val() || '');
+        const options = ['<option value="">Todos</option>'];
+        (values || []).forEach((value) => {
+            const raw = String(value);
+            const selected = raw === current ? ' selected' : '';
+            options.push(`<option value="${escapeHtml(raw)}"${selected}>${escapeHtml(raw)}</option>`);
+        });
+
+        $select.html(options.join(''));
+    }
+
+    function renderFilterOptions(filterOptions, selectedFilters) {
+        renderFilterSelect('#okd-pipeline', filterOptions.pipeline, selectedFilters.pipeline);
+        renderFilterSelect('#okd-status', filterOptions.status, selectedFilters.status);
+        renderFilterSelect('#okd-bu', filterOptions.bu, selectedFilters.bu);
+        renderFilterSelect('#okd-origem', filterOptions.origem, selectedFilters.origem);
+        renderFilterSelect('#okd-responsible', filterOptions.responsible_user, selectedFilters.responsible_user);
+        renderFilterSelect('#okd-faixa', filterOptions.faixa_faturamento, selectedFilters.faixa_faturamento);
+    }
+
     function loadDashboard() {
         if (typeof OptimizeKommoDashboard === 'undefined') return;
-        const pipelineFilter = $('#okd-pipeline').val();
+        const payload = dashboardPayload();
+        const pipelineFilter = payload.pipeline;
 
-        $.post(OptimizeKommoDashboard.ajaxUrl, dashboardPayload(), function (resp) {
+        $.post(OptimizeKommoDashboard.ajaxUrl, payload, function (resp) {
             if (!resp.success) return;
+            renderFilterOptions(resp.data.filter_options || {}, payload);
 
             renderCards(resp.data.cards || {});
             renderTable(resp.data.table || [], pipelineFilter);
@@ -258,6 +310,13 @@
 
     $(document).on('click', '#okd-apply-filters', function () {
         loadDashboard();
+    });
+
+    $(document).on('change', '.okd-chart-type', function () {
+        const chartId = $(this).data('chart-id');
+        if (!chartId || !chartState[chartId]) return;
+        const state = chartState[chartId];
+        renderChart(chartId, state.title, state.map, state.activePipeline);
     });
 
     $(document).on('click', '#optimize-kommo-sync-now', function () {

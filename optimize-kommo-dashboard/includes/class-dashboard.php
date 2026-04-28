@@ -6,6 +6,23 @@ if (! defined('ABSPATH')) {
 
 class Optimize_Kommo_Dashboard
 {
+    private const SDR_PIPELINE = 'SDR | Grupo Optimize';
+    private const SDR_QUALIFIED_STATUSES = [
+        'QUALIFICADO MAS AINDA NÃO AGENDOU',
+        'CLOSER - REUNIÃO AGENDADA',
+    ];
+    private const SDR_STATUS_ORDER = [
+        'INCOMING LEADS',
+        'SDR - CONTATO INICIAL',
+        'SDR - AGENDADO COM O SDR',
+        'SDR - FUP SEM RESPOSTAS',
+        'SDR - QUALIFICAÇÃO INICIADA',
+        'SDR - NO SHOW SDR',
+        'QUALIFICADO MAS AINDA NÃO AGENDOU',
+        'CLOSER - REUNIÃO AGENDADA',
+        'NÃO AVANÇOU',
+    ];
+
     public static function init()
     {
         add_shortcode('optimize_kommo_dashboard', [__CLASS__, 'render_shortcode']);
@@ -118,19 +135,37 @@ class Optimize_Kommo_Dashboard
         $where_sql = implode(' AND ', $where);
         $base_sql = "FROM {$table} WHERE {$where_sql}";
 
-        $total = (int) $wpdb->get_var(self::prepare_query("SELECT COUNT(*) {$base_sql}", $params));
-        $qualificados = (int) $wpdb->get_var(self::prepare_query("SELECT COUNT(*) {$base_sql} AND status_name NOT LIKE %s", array_merge($params, ['%Desqualificado%'])));
-        $desqualificados = (int) $wpdb->get_var(self::prepare_query("SELECT COUNT(*) {$base_sql} AND (status_name LIKE %s OR tags LIKE %s)", array_merge($params, ['%Desqualificado%', '%Desqualificado%'])));
-        $agendados = (int) $wpdb->get_var(self::prepare_query("SELECT COUNT(*) {$base_sql} AND (status_name LIKE %s OR tags LIKE %s)", array_merge($params, ['%Agendado%', '%Agendado%'])));
-        $acima_20m = (int) $wpdb->get_var(self::prepare_query("SELECT COUNT(*) {$base_sql} AND faixa_faturamento REGEXP %s", array_merge($params, ['(2[0-9]|[3-9][0-9]).*(mi|milh|MM)'])));
-
         $rows = $wpdb->get_results(
             self::prepare_query(
-                "SELECT lead_name, created_at, responsible_user, pipeline_name, status_name, bu, origem, faixa_faturamento, link_relatorio {$base_sql} ORDER BY created_at DESC LIMIT 300",
+                "SELECT lead_name, created_at, responsible_user, pipeline_name, status_name, bu, origem, faixa_faturamento, link_relatorio {$base_sql} ORDER BY created_at DESC",
                 $params
             ),
             ARRAY_A
         );
+
+        $total = count($rows);
+        $qualificados = 0;
+        $desqualificados = 0;
+        $agendados = 0;
+        $acima_20m = 0;
+
+        foreach ($rows as $row) {
+            if (self::is_qualified_lead($row)) {
+                $qualificados++;
+            }
+
+            if (self::is_disqualified_lead($row)) {
+                $desqualificados++;
+            }
+
+            if (self::contains_keyword((string) ($row['status_name'] ?? ''), ['agendado'])) {
+                $agendados++;
+            }
+
+            if (self::estimate_revenue_value((string) ($row['faixa_faturamento'] ?? '')) >= 20000000) {
+                $acima_20m++;
+            }
+        }
 
         $charts = [
             'by_day' => self::group_count($rows, static function ($row) {
@@ -153,6 +188,12 @@ class Optimize_Kommo_Dashboard
             }),
         ];
 
+        if (self::normalize_text($request['pipeline'] ?? '') === self::normalize_text(self::SDR_PIPELINE)) {
+            $charts['by_status'] = self::order_status_map_for_sdr($charts['by_status']);
+        }
+
+        $table_rows = array_slice($rows, 0, 300);
+
         wp_send_json_success(
             [
                 'cards' => [
@@ -162,11 +203,11 @@ class Optimize_Kommo_Dashboard
                     'desqualificados'=> $desqualificados,
                     'agendados'      => $agendados,
                     'acima_20m'      => $acima_20m,
-                    'por_bu'         => $charts['by_bu'],
                     'por_origem'     => $charts['by_origem'],
                 ],
                 'charts' => $charts,
-                'table'  => $rows,
+                'table'  => $table_rows,
+                'filter_options' => self::build_filter_options($request),
             ]
         );
     }
@@ -195,5 +236,149 @@ class Optimize_Kommo_Dashboard
         }
 
         return $counts;
+    }
+
+    private static function build_filter_options(array $request)
+    {
+        global $wpdb;
+        $table = Optimize_Kommo_DB::leads_table();
+
+        $columns = [
+            'pipeline' => 'pipeline_name',
+            'status' => 'status_name',
+            'bu' => 'bu',
+            'origem' => 'origem',
+            'responsible_user' => 'responsible_user',
+            'faixa_faturamento' => 'faixa_faturamento',
+        ];
+
+        $options = [];
+        foreach ($columns as $key => $column) {
+            $values = $wpdb->get_col("SELECT DISTINCT {$column} FROM {$table} WHERE {$column} IS NOT NULL AND TRIM({$column}) <> ''");
+            $values = array_values(array_filter(array_map('strval', $values)));
+
+            if ('status' === $key && self::normalize_text($request['pipeline'] ?? '') === self::normalize_text(self::SDR_PIPELINE)) {
+                $values = self::order_status_values_for_sdr($values);
+            } else {
+                natcasesort($values);
+                $values = array_values($values);
+            }
+
+            $options[$key] = $values;
+        }
+
+        return $options;
+    }
+
+    private static function normalize_text($value)
+    {
+        $text = strtolower(trim(preg_replace('/\s+/u', ' ', (string) $value)));
+
+        return remove_accents($text);
+    }
+
+    private static function contains_keyword($value, array $keywords)
+    {
+        $normalized = self::normalize_text($value);
+        foreach ($keywords as $keyword) {
+            if (false !== strpos($normalized, self::normalize_text($keyword))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function is_qualified_lead(array $row)
+    {
+        $pipeline = self::normalize_text($row['pipeline_name'] ?? '');
+        $status = self::normalize_text($row['status_name'] ?? '');
+
+        if ($pipeline === self::normalize_text(self::SDR_PIPELINE)) {
+            foreach (self::SDR_QUALIFIED_STATUSES as $allowed) {
+                if ($status === self::normalize_text($allowed)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return ! self::contains_keyword((string) ($row['status_name'] ?? ''), ['desqualificado', 'nao avancou', 'não avançou', 'baixa']);
+    }
+
+    private static function is_disqualified_lead(array $row)
+    {
+        $status = (string) ($row['status_name'] ?? '');
+        $is_low_status = self::contains_keyword($status, ['baixa', 'desqualificado', 'nao avancou', 'não avançou']);
+        if (! $is_low_status) {
+            return false;
+        }
+
+        $revenue = self::estimate_revenue_value((string) ($row['faixa_faturamento'] ?? ''));
+
+        return $revenue > 0 && $revenue < 1000000;
+    }
+
+    private static function estimate_revenue_value($raw_value)
+    {
+        $value = self::normalize_text($raw_value);
+        if ('' === $value) {
+            return 0;
+        }
+
+        if (preg_match('/(\d+(?:[.,]\d+)?)\s*(mi|milhao|milhoes|milhaoes|mm)\b/u', $value, $matches)) {
+            return (float) str_replace(',', '.', $matches[1]) * 1000000;
+        }
+
+        if (preg_match('/(\d+(?:[.,]\d+)?)\s*mil\b/u', $value, $matches)) {
+            return (float) str_replace(',', '.', $matches[1]) * 1000;
+        }
+
+        if (preg_match('/\d[\d\.\,]*/u', $value, $matches)) {
+            $numeric = preg_replace('/[^\d]/', '', $matches[0]);
+            return (float) $numeric;
+        }
+
+        return 0;
+    }
+
+    private static function order_status_values_for_sdr(array $values)
+    {
+        $normalized_map = [];
+        foreach ($values as $value) {
+            $normalized_map[self::normalize_text($value)] = $value;
+        }
+
+        $ordered = [];
+        foreach (self::SDR_STATUS_ORDER as $status) {
+            $key = self::normalize_text($status);
+            if (isset($normalized_map[$key])) {
+                $ordered[] = $normalized_map[$key];
+                unset($normalized_map[$key]);
+            }
+        }
+
+        if (! empty($normalized_map)) {
+            $remaining = array_values($normalized_map);
+            natcasesort($remaining);
+            $ordered = array_merge($ordered, array_values($remaining));
+        }
+
+        return $ordered;
+    }
+
+    private static function order_status_map_for_sdr(array $map)
+    {
+        $ordered_keys = self::order_status_values_for_sdr(array_keys($map));
+        $ordered_map = [];
+
+        foreach ($ordered_keys as $key) {
+            if (isset($map[$key])) {
+                $ordered_map[$key] = $map[$key];
+            }
+        }
+
+        return $ordered_map;
     }
 }
