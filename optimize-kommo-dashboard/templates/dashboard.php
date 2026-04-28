@@ -1,5 +1,14 @@
 <?php if (! defined('ABSPATH')) { exit; } ?>
 <div id="optimize-kommo-dashboard">
+    <div class="okd-dashboard-header okd-surface">
+        <div class="okd-brand">
+            <?php $logo_url = (string) get_option('optimize_kommo_dashboard_logo_url', ''); ?>
+            <?php if ('' !== $logo_url) : ?>
+                <img src="<?php echo esc_url($logo_url); ?>" alt="Grupo Optimize" class="okd-brand-logo" />
+            <?php endif; ?>
+            <h1 class="okd-brand-title"><?php echo esc_html((string) get_option('optimize_kommo_dashboard_title', 'Dashboard Comercial – Grupo Optimize')); ?></h1>
+        </div>
+    </div>
     <div class="okd-topbar">
         <a class="okd-btn-logout" href="<?php echo esc_url(wp_logout_url(Optimize_Kommo_Dashboard::get_login_page_url())); ?>">Sair</a>
     </div>
@@ -36,6 +45,14 @@
             <label for="okd-faixa">Faixa de faturamento</label>
             <select id="okd-faixa"><option value="">Todos</option></select>
         </div>
+        <div class="okd-filter">
+            <label for="okd-loss-reason">Motivo de perda</label>
+            <select id="okd-loss-reason"><option value="">Todos</option></select>
+        </div>
+        <div class="okd-filter">
+            <label for="okd-non-advance-category">Categoria de não avanço</label>
+            <select id="okd-non-advance-category"><option value="">Todos</option></select>
+        </div>
         <button id="okd-apply-filters" class="okd-btn-primary">Aplicar filtros</button>
     </div>
 
@@ -66,6 +83,10 @@
             <div class="okd-chart-head"><h3>Leads por funil</h3><select class="okd-chart-type" data-chart-id="okd-chart-pipeline"><option value="bar">Barra</option><option value="line">Linha</option><option value="pie">Pizza</option><option value="doughnut">Rosca</option><option value="table">Planilha</option></select></div>
             <canvas id="okd-chart-pipeline"></canvas><div id="okd-sheet-pipeline" class="okd-chart-sheet"></div>
         </section>
+        <section class="okd-surface okd-chart-card">
+            <div class="okd-chart-head"><h3>Motivos de não avanço</h3><select class="okd-chart-type" data-chart-id="okd-chart-non-advance"><option value="bar">Barra</option><option value="line">Linha</option><option value="pie">Pizza</option><option value="doughnut">Rosca</option><option value="table">Planilha</option></select></div>
+            <canvas id="okd-chart-non-advance"></canvas><div id="okd-sheet-non-advance" class="okd-chart-sheet"></div>
+        </section>
     </div>
 
     <div class="okd-surface okd-table-wrap">
@@ -80,6 +101,8 @@
                     <th>BU</th>
                     <th>Origem</th>
                     <th>Faixa faturamento</th>
+                    <th>Motivo de perda</th>
+                    <th>Categoria de não avanço</th>
                     <th>Relatório</th>
                 </tr>
             </thead>

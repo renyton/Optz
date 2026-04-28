@@ -41,6 +41,9 @@ class Optimize_Kommo_DB
             bu VARCHAR(80) DEFAULT 'Não classificado',
             origem VARCHAR(80) DEFAULT 'Outros',
             faixa_faturamento VARCHAR(180) DEFAULT '',
+            loss_reason_id BIGINT(20) UNSIGNED DEFAULT 0,
+            loss_reason_name VARCHAR(255) DEFAULT '',
+            non_advance_category VARCHAR(180) DEFAULT '',
             score_diagnostico VARCHAR(80) DEFAULT '',
             setor_atuacao VARCHAR(180) DEFAULT '',
             link_relatorio TEXT NULL,
@@ -57,7 +60,9 @@ class Optimize_Kommo_DB
             KEY bu (bu),
             KEY origem (origem),
             KEY status_name (status_name),
-            KEY pipeline_name (pipeline_name)
+            KEY pipeline_name (pipeline_name),
+            KEY loss_reason_name (loss_reason_name),
+            KEY non_advance_category (non_advance_category)
         ) {$charset_collate};";
 
         $sql_logs = "CREATE TABLE {$logs} (

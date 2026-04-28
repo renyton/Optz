@@ -18,6 +18,9 @@
         'Acima de R$ 20M/ano': '💎',
         'Leads por BU': '🏢',
         'Leads por origem': '🧭',
+        'Desqualificados por faturamento': '💸',
+        'Base de recuperação': '🔁',
+        'Não avançaram sem motivo': '❓',
     };
     const SDR_PIPELINE_NAME = 'SDR | Grupo Optimize';
     const SDR_STATUS_ORDER = [
@@ -98,6 +101,7 @@
         if (id.includes('status')) return 'status';
         if (id.includes('faixa')) return 'faixa';
         if (id.includes('pipeline')) return 'pipeline';
+        if (id.includes('non-advance')) return 'status';
         if (id.includes('bu')) return 'bu';
         return 'day';
     }
@@ -208,6 +212,9 @@
             cardHtml('Leads desqualificados', cards.desqualificados, 'Leads encerrados sem potencial'),
             cardHtml('Reuniões agendadas', cards.agendados, 'Status com reunião marcada'),
             cardHtml('Acima de R$ 20M/ano', cards.acima_20m, 'Leads HIGH VALUE'),
+            cardHtml('Desqualificados por faturamento', cards.desqualificados_faturamento, 'Não avançaram por baixa receita'),
+            cardHtml('Base de recuperação', cards.base_recuperacao, 'Leads sem retorno/interação'),
+            cardHtml('Não avançaram sem motivo', cards.sem_motivo_identificado, 'Sem razão identificada na Kommo'),
             cardHtml('Leads por origem', Object.keys(cards.por_origem || {}).length, summarizeMap(cards.por_origem)),
         ];
 
@@ -242,10 +249,10 @@
                 link = `<a href="${safeHref}" target="_blank" rel="noopener noreferrer">Abrir</a>`;
             }
 
-            return `<tr><td>${escapeHtml(r.lead_name)}</td><td>${escapeHtml(r.created_at)}</td><td>${escapeHtml(r.responsible_user)}</td><td>${escapeHtml(r.pipeline_name)}</td><td>${escapeHtml(r.status_name)}</td><td>${escapeHtml(r.bu)}</td><td>${escapeHtml(r.origem)}</td><td>${escapeHtml(r.faixa_faturamento)}</td><td>${link}</td></tr>`;
+            return `<tr><td>${escapeHtml(r.lead_name)}</td><td>${escapeHtml(r.created_at)}</td><td>${escapeHtml(r.responsible_user)}</td><td>${escapeHtml(r.pipeline_name)}</td><td>${escapeHtml(r.status_name)}</td><td>${escapeHtml(r.bu)}</td><td>${escapeHtml(r.origem)}</td><td>${escapeHtml(r.faixa_faturamento)}</td><td>${escapeHtml(r.loss_reason_name || '-')}</td><td>${escapeHtml(r.non_advance_category || '-')}</td><td>${link}</td></tr>`;
         }).join('');
 
-        tbody.html(html || '<tr><td colspan="9">Sem dados.</td></tr>');
+        tbody.html(html || '<tr><td colspan="11">Sem dados.</td></tr>');
     }
 
     function dashboardPayload() {
@@ -260,6 +267,8 @@
             origem: $('#okd-origem').val(),
             responsible_user: $('#okd-responsible').val(),
             faixa_faturamento: $('#okd-faixa').val(),
+            loss_reason_name: $('#okd-loss-reason').val(),
+            non_advance_category: $('#okd-non-advance-category').val(),
         };
     }
 
@@ -285,6 +294,8 @@
         renderFilterSelect('#okd-origem', filterOptions.origem, selectedFilters.origem);
         renderFilterSelect('#okd-responsible', filterOptions.responsible_user, selectedFilters.responsible_user);
         renderFilterSelect('#okd-faixa', filterOptions.faixa_faturamento, selectedFilters.faixa_faturamento);
+        renderFilterSelect('#okd-loss-reason', filterOptions.loss_reason_name, selectedFilters.loss_reason_name);
+        renderFilterSelect('#okd-non-advance-category', filterOptions.non_advance_category, selectedFilters.non_advance_category);
     }
 
     function loadDashboard() {
@@ -305,6 +316,7 @@
             renderChart('okd-chart-faixa', 'Leads por faturamento', resp.data.charts.by_faixa || {}, pipelineFilter);
             renderChart('okd-chart-status', 'Leads por status', resp.data.charts.by_status || {}, pipelineFilter);
             renderChart('okd-chart-pipeline', 'Leads por funil', resp.data.charts.by_pipeline || {}, pipelineFilter);
+            renderChart('okd-chart-non-advance', 'Motivos de não avanço', resp.data.charts.non_advance_reasons || {}, pipelineFilter);
         });
     }
 

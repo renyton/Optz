@@ -40,6 +40,8 @@ class Optimize_Kommo_Admin
         register_setting('optimize_kommo_settings', 'optimize_kommo_token', ['sanitize_callback' => 'sanitize_text_field']);
         register_setting('optimize_kommo_settings', 'optimize_kommo_refresh_token', ['sanitize_callback' => 'sanitize_text_field']);
         register_setting('optimize_kommo_settings', 'optimize_kommo_interval', ['sanitize_callback' => 'absint']);
+        register_setting('optimize_kommo_settings', 'optimize_kommo_dashboard_logo_url', ['sanitize_callback' => 'esc_url_raw']);
+        register_setting('optimize_kommo_settings', 'optimize_kommo_dashboard_title', ['sanitize_callback' => 'sanitize_text_field']);
         register_setting('optimize_kommo_settings', 'optimize_kommo_authorized_users', ['sanitize_callback' => [__CLASS__, 'sanitize_authorized_users']]);
     }
 
@@ -76,6 +78,7 @@ class Optimize_Kommo_Admin
             OPTIMIZE_KOMMO_DASHBOARD_VERSION,
             true
         );
+        wp_enqueue_media();
 
         wp_localize_script(
             'optimize-kommo-admin-js',

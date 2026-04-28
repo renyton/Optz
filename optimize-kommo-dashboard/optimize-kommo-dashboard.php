@@ -28,6 +28,7 @@ register_deactivation_hook(__FILE__, ['Optimize_Kommo_Sync', 'deactivate']);
 
 function optimize_kommo_dashboard_bootstrap()
 {
+    Optimize_Kommo_DB::create_tables();
     Optimize_Kommo_Activator::ensure_roles_and_caps();
     Optimize_Kommo_Admin::init();
     Optimize_Kommo_Sync::init();

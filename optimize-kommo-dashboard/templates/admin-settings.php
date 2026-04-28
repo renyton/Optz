@@ -49,6 +49,17 @@
                 <td><input type="password" id="optimize_kommo_refresh_token" name="optimize_kommo_refresh_token" value="<?php echo esc_attr(get_option('optimize_kommo_refresh_token', '')); ?>" class="regular-text" autocomplete="new-password" /></td>
             </tr>
             <tr>
+                <th><label for="optimize_kommo_dashboard_title">Título do dashboard</label></th>
+                <td><input type="text" id="optimize_kommo_dashboard_title" name="optimize_kommo_dashboard_title" value="<?php echo esc_attr((string) get_option('optimize_kommo_dashboard_title', 'Dashboard Comercial – Grupo Optimize')); ?>" class="regular-text" /></td>
+            </tr>
+            <tr>
+                <th><label for="optimize_kommo_dashboard_logo_url">Logo (URL)</label></th>
+                <td>
+                    <input type="url" id="optimize_kommo_dashboard_logo_url" name="optimize_kommo_dashboard_logo_url" value="<?php echo esc_attr((string) get_option('optimize_kommo_dashboard_logo_url', '')); ?>" class="regular-text" />
+                    <button type="button" class="button" id="okd-upload-logo">Selecionar logo</button>
+                </td>
+            </tr>
+            <tr>
                 <th><label for="optimize_kommo_interval">Intervalo de atualização (minutos)</label></th>
                 <td><input type="number" min="1" id="optimize_kommo_interval" name="optimize_kommo_interval" value="<?php echo esc_attr((string) get_option('optimize_kommo_interval', 10)); ?>" class="small-text" /></td>
             </tr>
@@ -182,4 +193,21 @@
             <?php endforeach; endif; ?>
         </tbody>
     </table>
+
+    <script>
+        (function($){
+            $(document).on('click', '#okd-upload-logo', function(e){
+                e.preventDefault();
+                if (typeof wp === 'undefined' || !wp.media) {
+                    return;
+                }
+                const frame = wp.media({ title: 'Selecionar logo', button: { text: 'Usar logo' }, multiple: false });
+                frame.on('select', function(){
+                    const attachment = frame.state().get('selection').first().toJSON();
+                    $('#optimize_kommo_dashboard_logo_url').val(attachment.url || '');
+                });
+                frame.open();
+            });
+        })(jQuery);
+    </script>
 </div>

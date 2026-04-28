@@ -204,6 +204,10 @@ class Optimize_Kommo_API
         if (is_wp_error($pipelines_response)) {
             return $pipelines_response;
         }
+        $loss_reasons_response = self::request('/api/v4/leads/loss_reasons');
+        if (is_wp_error($loss_reasons_response)) {
+            return $loss_reasons_response;
+        }
 
         $users = [];
         foreach (($users_response['_embedded']['users'] ?? []) as $user) {
@@ -212,6 +216,7 @@ class Optimize_Kommo_API
 
         $pipelines = [];
         $statuses = [];
+        $loss_reasons = [];
 
         foreach (($pipelines_response['_embedded']['pipelines'] ?? []) as $pipeline) {
             $pipeline_id = (int) ($pipeline['id'] ?? 0);
@@ -222,10 +227,15 @@ class Optimize_Kommo_API
             }
         }
 
+        foreach (($loss_reasons_response['_embedded']['loss_reasons'] ?? []) as $reason) {
+            $loss_reasons[(int) ($reason['id'] ?? 0)] = sanitize_text_field((string) ($reason['name'] ?? ''));
+        }
+
         return [
             'users'     => $users,
             'pipelines' => $pipelines,
             'statuses'  => $statuses,
+            'loss_reasons' => $loss_reasons,
         ];
     }
 }

@@ -227,6 +227,8 @@ class Optimize_Kommo_Dashboard
             'origem'            => 'origem',
             'responsible_user'  => 'responsible_user',
             'faixa_faturamento' => 'faixa_faturamento',
+            'loss_reason_name'  => 'loss_reason_name',
+            'non_advance_category' => 'non_advance_category',
         ];
 
         if ('' !== $date_start) {
@@ -252,7 +254,7 @@ class Optimize_Kommo_Dashboard
 
         $rows = $wpdb->get_results(
             self::prepare_query(
-                "SELECT lead_name, created_at, responsible_user, pipeline_name, status_name, bu, origem, faixa_faturamento, link_relatorio {$base_sql} ORDER BY created_at DESC",
+                "SELECT lead_name, created_at, responsible_user, pipeline_name, status_name, bu, origem, faixa_faturamento, link_relatorio, loss_reason_name, non_advance_category {$base_sql} ORDER BY created_at DESC",
                 $params
             ),
             ARRAY_A
@@ -263,6 +265,9 @@ class Optimize_Kommo_Dashboard
         $desqualificados = 0;
         $agendados = 0;
         $acima_20m = 0;
+        $desqualificados_faturamento = 0;
+        $base_recuperacao = 0;
+        $sem_motivo_identificado = 0;
 
         foreach ($rows as $row) {
             if (self::is_qualified_lead($row)) {
@@ -279,6 +284,15 @@ class Optimize_Kommo_Dashboard
 
             if (self::estimate_revenue_value((string) ($row['faixa_faturamento'] ?? '')) >= 20000000) {
                 $acima_20m++;
+            }
+
+            $category = (string) ($row['non_advance_category'] ?? '');
+            if ('Desqualificado por faturamento' === $category) {
+                $desqualificados_faturamento++;
+            } elseif ('Base de recuperação' === $category) {
+                $base_recuperacao++;
+            } elseif ('Não avançou - sem motivo identificado' === $category) {
+                $sem_motivo_identificado++;
             }
         }
 
@@ -301,6 +315,13 @@ class Optimize_Kommo_Dashboard
             'by_pipeline' => self::group_count($rows, static function ($row) {
                 return (string) ($row['pipeline_name'] ?: 'N/A');
             }),
+            'non_advance_reasons' => self::group_count($rows, static function ($row) {
+                $category = (string) ($row['non_advance_category'] ?? '');
+                if ('' === trim($category)) {
+                    return 'Outros';
+                }
+                return $category;
+            }),
         ];
 
         if (self::normalize_text($request['pipeline'] ?? '') === self::normalize_text(self::SDR_PIPELINE)) {
@@ -318,6 +339,9 @@ class Optimize_Kommo_Dashboard
                     'desqualificados'=> $desqualificados,
                     'agendados'      => $agendados,
                     'acima_20m'      => $acima_20m,
+                    'desqualificados_faturamento' => $desqualificados_faturamento,
+                    'base_recuperacao' => $base_recuperacao,
+                    'sem_motivo_identificado' => $sem_motivo_identificado,
                     'por_origem'     => $charts['by_origem'],
                 ],
                 'charts' => $charts,
@@ -365,6 +389,8 @@ class Optimize_Kommo_Dashboard
             'origem' => 'origem',
             'responsible_user' => 'responsible_user',
             'faixa_faturamento' => 'faixa_faturamento',
+            'loss_reason_name' => 'loss_reason_name',
+            'non_advance_category' => 'non_advance_category',
         ];
 
         $options = [];
