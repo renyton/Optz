@@ -85,12 +85,24 @@ class Optimize_Kommo_Sync
         $updated = 0;
         $error_message = null;
         $status = 'error';
+        $sync_debug = [
+            'loss_reasons_total' => 0,
+            'leads_with_loss_reason_id' => 0,
+            'leads_nao_avancou_total' => 0,
+            'leads_nao_avancou_without_loss_reason_id' => 0,
+            'oauth_scope_hint' => '',
+        ];
 
         try {
             $lookups = Optimize_Kommo_API::fetch_lookups();
             if (is_wp_error($lookups)) {
+                $scope_hint_message = $lookups->get_error_message();
+                if (false !== stripos($scope_hint_message, '403') || false !== stripos($scope_hint_message, '401')) {
+                    $sync_debug['oauth_scope_hint'] = 'Possível falta de escopo OAuth para leitura de leads/loss_reasons.';
+                }
                 throw new RuntimeException($lookups->get_error_message());
             }
+            $sync_debug['loss_reasons_total'] = count((array) ($lookups['loss_reasons'] ?? []));
 
             $leads = Optimize_Kommo_API::fetch_leads();
             if (is_wp_error($leads)) {
@@ -103,6 +115,17 @@ class Optimize_Kommo_Sync
                 $normalized = Optimize_Kommo_Normalizer::normalize_lead($lead, $lookups);
                 if (empty($normalized['kommo_lead_id'])) {
                     continue;
+                }
+
+                if (! empty($normalized['loss_reason_id'])) {
+                    $sync_debug['leads_with_loss_reason_id']++;
+                }
+
+                if ('NÃO AVANÇOU' === mb_strtoupper((string) ($normalized['status_name'] ?? ''), 'UTF-8')) {
+                    $sync_debug['leads_nao_avancou_total']++;
+                    if (empty($normalized['loss_reason_id'])) {
+                        $sync_debug['leads_nao_avancou_without_loss_reason_id']++;
+                    }
                 }
 
                 $exists = (int) $wpdb->get_var(
@@ -122,9 +145,10 @@ class Optimize_Kommo_Sync
             }
 
             $status = 'success';
+            $error_message = wp_json_encode($sync_debug, JSON_UNESCAPED_UNICODE);
             update_option('optimize_kommo_last_sync', current_time('mysql'));
         } catch (Throwable $exception) {
-            $error_message = sanitize_textarea_field($exception->getMessage());
+            $error_message = sanitize_textarea_field($exception->getMessage()) . ' | DEBUG: ' . wp_json_encode($sync_debug, JSON_UNESCAPED_UNICODE);
         }
 
         $wpdb->update(

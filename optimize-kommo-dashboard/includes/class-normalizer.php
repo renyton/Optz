@@ -29,6 +29,15 @@ class Optimize_Kommo_Normalizer
         $loss_reason_name = sanitize_text_field((string) ($lookups['loss_reasons'][$loss_reason_id] ?? ''));
         $non_advance_category = self::classify_non_advance_category($pipeline_name, $status_name, $faixa_faturamento, $loss_reason_name);
 
+        $debug_payload = [
+            'lead_id' => absint($lead['id'] ?? 0),
+            'status_name' => sanitize_text_field($status_name),
+            'pipeline_name' => $pipeline_name,
+            'loss_reason_id' => $loss_reason_id,
+            'loss_reason_name' => $loss_reason_name,
+            'lead_payload' => $lead,
+        ];
+
         return [
             'kommo_lead_id'      => absint($lead['id'] ?? 0),
             'lead_name'          => sanitize_text_field((string) ($lead['name'] ?? '')),
@@ -54,7 +63,7 @@ class Optimize_Kommo_Normalizer
             'utm_campaign'       => sanitize_text_field((string) ($custom_fields['utm_campaign'] ?? '')),
             'utm_content'        => sanitize_text_field((string) ($custom_fields['utm_content'] ?? '')),
             'utm_term'           => sanitize_text_field((string) ($custom_fields['utm_term'] ?? '')),
-            'raw_payload'        => wp_json_encode($lead, JSON_UNESCAPED_UNICODE),
+            'raw_payload'        => wp_json_encode($debug_payload, JSON_UNESCAPED_UNICODE),
         ];
     }
 

@@ -171,7 +171,7 @@ class Optimize_Kommo_API
         $results = [];
 
         while ($page <= 100) {
-            $body = self::request(sprintf('/api/v4/leads?limit=250&page=%d&with=contacts', $page));
+            $body = self::request(sprintf('/api/v4/leads?limit=250&page=%d&with=contacts,loss_reason,is_price_modified_by_robot', $page));
             if (is_wp_error($body)) {
                 return $body;
             }
