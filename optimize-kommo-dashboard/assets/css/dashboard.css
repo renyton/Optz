@@ -1,0 +1,7 @@
+#optimize-kommo-dashboard { font-family: Arial, sans-serif; }
+.okd-filters { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.okd-cards { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.okd-card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px; background: #fff; }
+.okd-charts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px; }
+.okd-table { width: 100%; border-collapse: collapse; }
+.okd-table th, .okd-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
