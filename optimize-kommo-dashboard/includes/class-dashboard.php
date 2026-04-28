@@ -268,6 +268,7 @@ class Optimize_Kommo_Dashboard
         $desqualificados_faturamento = 0;
         $base_recuperacao = 0;
         $sem_motivo_identificado = 0;
+        $total_nao_avancaram = 0;
 
         foreach ($rows as $row) {
             if (self::is_qualified_lead($row)) {
@@ -287,6 +288,9 @@ class Optimize_Kommo_Dashboard
             }
 
             $category = (string) ($row['non_advance_category'] ?? '');
+            if ('NÃO AVANÇOU' === mb_strtoupper((string) ($row['status_name'] ?? ''), 'UTF-8')) {
+                $total_nao_avancaram++;
+            }
             if ('Desqualificado por faturamento' === $category) {
                 $desqualificados_faturamento++;
             } elseif ('Base de recuperação' === $category) {
@@ -322,6 +326,10 @@ class Optimize_Kommo_Dashboard
                 }
                 return $category;
             }),
+            'loss_reasons' => self::group_count($rows, static function ($row) {
+                $reason = trim((string) ($row['loss_reason_name'] ?? ''));
+                return '' === $reason ? 'Sem motivo informado' : $reason;
+            }),
         ];
 
         if (self::normalize_text($request['pipeline'] ?? '') === self::normalize_text(self::SDR_PIPELINE)) {
@@ -329,6 +337,7 @@ class Optimize_Kommo_Dashboard
         }
 
         $table_rows = array_slice($rows, 0, 300);
+        $filter_options = self::build_filter_options($request);
 
         wp_send_json_success(
             [
@@ -342,11 +351,24 @@ class Optimize_Kommo_Dashboard
                     'desqualificados_faturamento' => $desqualificados_faturamento,
                     'base_recuperacao' => $base_recuperacao,
                     'sem_motivo_identificado' => $sem_motivo_identificado,
+                    'total_nao_avancaram' => $total_nao_avancaram,
                     'por_origem'     => $charts['by_origem'],
                 ],
                 'charts' => $charts,
                 'table'  => $table_rows,
-                'filter_options' => self::build_filter_options($request),
+                'filter_options' => $filter_options,
+                'lossReasonsChart' => $charts['loss_reasons'],
+                'nonAdvanceCategoryChart' => $charts['non_advance_reasons'],
+                'nonAdvanceKpis' => [
+                    'totalNaoAvancaram' => $total_nao_avancaram,
+                    'desqualificadosPorFaturamento' => $desqualificados_faturamento,
+                    'baseRecuperacao' => $base_recuperacao,
+                    'semMotivoIdentificado' => $sem_motivo_identificado,
+                ],
+                'filterOptions' => [
+                    'lossReasons' => (array) ($filter_options['loss_reason_name'] ?? []),
+                    'nonAdvanceCategories' => (array) ($filter_options['non_advance_category'] ?? []),
+                ],
             ]
         );
     }

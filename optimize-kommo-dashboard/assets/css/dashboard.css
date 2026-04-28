@@ -232,6 +232,13 @@
     margin-top: 10px;
 }
 
+.okd-chart-empty {
+    display: none;
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--okd-muted);
+}
+
 .okd-sheet-table {
     width: 100%;
     border-collapse: collapse;

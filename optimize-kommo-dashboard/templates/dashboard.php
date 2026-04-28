@@ -87,6 +87,10 @@
             <div class="okd-chart-head"><h3>Motivos de não avanço</h3><select class="okd-chart-type" data-chart-id="okd-chart-non-advance"><option value="bar">Barra</option><option value="line">Linha</option><option value="pie">Pizza</option><option value="doughnut">Rosca</option><option value="table">Planilha</option></select></div>
             <canvas id="okd-chart-non-advance"></canvas><div id="okd-sheet-non-advance" class="okd-chart-sheet"></div>
         </section>
+        <section class="okd-surface okd-chart-card">
+            <div class="okd-chart-head"><h3>Motivos de perda / não avanço</h3><select class="okd-chart-type" data-chart-id="okd-chart-loss-reasons"><option value="bar">Barra</option><option value="pie">Pizza</option><option value="doughnut">Rosca</option><option value="table">Planilha</option></select></div>
+            <canvas id="okd-chart-loss-reasons"></canvas><div id="okd-sheet-loss-reasons" class="okd-chart-sheet"></div>
+        </section>
     </div>
 
     <div class="okd-surface okd-table-wrap">

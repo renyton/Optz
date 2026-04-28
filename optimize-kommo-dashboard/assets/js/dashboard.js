@@ -135,10 +135,25 @@
 
         if (sheetEl) {
             sheetEl.style.display = isTable ? 'block' : 'none';
-            sheetEl.innerHTML = isTable ? renderSheetTable(ds.labels, ds.data) : '';
+            sheetEl.innerHTML = isTable ? renderSheetTable(ds.labels, ds.data, title) : '';
         }
 
         canvas.style.display = isTable ? 'none' : 'block';
+        const emptyMsgId = `${id}-empty`;
+        let emptyEl = document.getElementById(emptyMsgId);
+        if (!emptyEl) {
+            emptyEl = document.createElement('div');
+            emptyEl.id = emptyMsgId;
+            emptyEl.className = 'okd-chart-empty';
+            canvas.insertAdjacentElement('afterend', emptyEl);
+        }
+        const isEmpty = ds.labels.length === 0;
+        emptyEl.style.display = isEmpty ? 'block' : 'none';
+        emptyEl.textContent = title.includes('Motivos de perda') ? 'Nenhum motivo de perda encontrado no período selecionado' : 'Sem dados no período selecionado';
+        if (isEmpty) {
+            canvas.style.display = 'none';
+        }
+
         if (isTable) {
             return;
         }
@@ -181,7 +196,11 @@
         });
     }
 
-    function renderSheetTable(labels, data) {
+    function renderSheetTable(labels, data, title) {
+        if (!labels.length) {
+            const msg = title && title.includes('Motivos de perda') ? 'Nenhum motivo de perda encontrado no período selecionado' : 'Sem dados';
+            return `<p>${escapeHtml(msg)}</p>`;
+        }
         const rows = labels.map((label, idx) => `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(data[idx])}</td></tr>`).join('');
         return `<table class="okd-sheet-table"><thead><tr><th>Categoria</th><th>Quantidade</th></tr></thead><tbody>${rows || '<tr><td colspan="2">Sem dados</td></tr>'}</tbody></table>`;
     }
@@ -317,6 +336,7 @@
             renderChart('okd-chart-status', 'Leads por status', resp.data.charts.by_status || {}, pipelineFilter);
             renderChart('okd-chart-pipeline', 'Leads por funil', resp.data.charts.by_pipeline || {}, pipelineFilter);
             renderChart('okd-chart-non-advance', 'Motivos de não avanço', resp.data.charts.non_advance_reasons || {}, pipelineFilter);
+            renderChart('okd-chart-loss-reasons', 'Motivos de perda / não avanço', resp.data.lossReasonsChart || resp.data.charts.loss_reasons || {}, pipelineFilter);
         });
     }
 
