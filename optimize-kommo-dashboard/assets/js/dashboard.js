@@ -18,6 +18,18 @@
         'Leads por BU': '🏢',
         'Leads por origem': '🧭',
     };
+    const SDR_PIPELINE_NAME = 'SDR | Grupo Optimize';
+    const SDR_STATUS_ORDER = [
+        'INCOMING LEADS',
+        'SDR - CONTATO INICIAL',
+        'SDR - AGENDADO COM O SDR',
+        'SDR - FUP SEM RESPOSTAS',
+        'SDR - QUALIFICAÇÃO INICIADA',
+        'SDR - NO SHOW SDR',
+        'QUALIFICADO MAS AINDA NÃO AGENDOU',
+        'CLOSER - REUNIÃO AGENDADA',
+        'NÃO AVANÇOU',
+    ];
 
     function escapeHtml(value) {
         return String(value || '')
@@ -36,6 +48,46 @@
         };
     }
 
+    function normalizeLabel(value) {
+        return String(value || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLocaleLowerCase();
+    }
+
+    function isSdrPipeline(pipelineName) {
+        return normalizeLabel(pipelineName) === normalizeLabel(SDR_PIPELINE_NAME);
+    }
+
+    function orderStatusMapForPipeline(map, pipelineName) {
+        if (!isSdrPipeline(pipelineName)) {
+            return map || {};
+        }
+
+        const source = map || {};
+        const normalizedToOriginal = {};
+
+        Object.keys(source).forEach((key) => {
+            normalizedToOriginal[normalizeLabel(key)] = key;
+        });
+
+        const ordered = {};
+        SDR_STATUS_ORDER.forEach((status) => {
+            const match = normalizedToOriginal[normalizeLabel(status)];
+            if (match) {
+                ordered[match] = source[match];
+            }
+        });
+
+        Object.keys(source).forEach((key) => {
+            if (!Object.prototype.hasOwnProperty.call(ordered, key)) {
+                ordered[key] = source[key];
+            }
+        });
+
+        return ordered;
+    }
+
     function chartKindById(id) {
         if (id.includes('origem')) return 'origem';
         if (id.includes('status')) return 'status';
@@ -45,13 +97,17 @@
         return 'day';
     }
 
-    function renderChart(id, title, map) {
+    function renderChart(id, title, map, activePipeline) {
         const canvas = document.getElementById(id);
         if (!canvas || typeof Chart === 'undefined') {
             return;
         }
 
-        const ds = toDataset(map);
+        const effectiveMap = id === 'okd-chart-status'
+            ? orderStatusMapForPipeline(map, activePipeline)
+            : (map || {});
+
+        const ds = toDataset(effectiveMap);
         const kind = chartKindById(id);
         const palette = CHART_COLORS[kind] || CHART_COLORS.day;
         const isLine = id === 'okd-chart-day';
@@ -132,11 +188,28 @@
         el.html(items.join(''));
     }
 
-    function renderTable(rows) {
+    function renderTable(rows, activePipeline) {
         const tbody = $('#okd-table tbody');
         if (!tbody.length) return;
 
-        const html = (rows || []).map((r) => {
+        let orderedRows = Array.isArray(rows) ? rows.slice() : [];
+        if (isSdrPipeline(activePipeline)) {
+            const statusIndex = {};
+            SDR_STATUS_ORDER.forEach((name, idx) => {
+                statusIndex[normalizeLabel(name)] = idx;
+            });
+
+            orderedRows = orderedRows.sort((a, b) => {
+                const aIdx = statusIndex[normalizeLabel(a.status_name)];
+                const bIdx = statusIndex[normalizeLabel(b.status_name)];
+                const aRank = Number.isInteger(aIdx) ? aIdx : Number.MAX_SAFE_INTEGER;
+                const bRank = Number.isInteger(bIdx) ? bIdx : Number.MAX_SAFE_INTEGER;
+                if (aRank !== bRank) return aRank - bRank;
+                return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+            });
+        }
+
+        const html = orderedRows.map((r) => {
             let link = '-';
             if (r.link_relatorio) {
                 const safeHref = escapeHtml(r.link_relatorio);
@@ -166,19 +239,20 @@
 
     function loadDashboard() {
         if (typeof OptimizeKommoDashboard === 'undefined') return;
+        const pipelineFilter = $('#okd-pipeline').val();
 
         $.post(OptimizeKommoDashboard.ajaxUrl, dashboardPayload(), function (resp) {
             if (!resp.success) return;
 
             renderCards(resp.data.cards || {});
-            renderTable(resp.data.table || []);
+            renderTable(resp.data.table || [], pipelineFilter);
 
-            renderChart('okd-chart-day', 'Leads por dia', resp.data.charts.by_day || {});
-            renderChart('okd-chart-origem', 'Leads por origem', resp.data.charts.by_origem || {});
-            renderChart('okd-chart-bu', 'Leads por BU', resp.data.charts.by_bu || {});
-            renderChart('okd-chart-faixa', 'Leads por faturamento', resp.data.charts.by_faixa || {});
-            renderChart('okd-chart-status', 'Leads por status', resp.data.charts.by_status || {});
-            renderChart('okd-chart-pipeline', 'Leads por funil', resp.data.charts.by_pipeline || {});
+            renderChart('okd-chart-day', 'Leads por dia', resp.data.charts.by_day || {}, pipelineFilter);
+            renderChart('okd-chart-origem', 'Leads por origem', resp.data.charts.by_origem || {}, pipelineFilter);
+            renderChart('okd-chart-bu', 'Leads por BU', resp.data.charts.by_bu || {}, pipelineFilter);
+            renderChart('okd-chart-faixa', 'Leads por faturamento', resp.data.charts.by_faixa || {}, pipelineFilter);
+            renderChart('okd-chart-status', 'Leads por status', resp.data.charts.by_status || {}, pipelineFilter);
+            renderChart('okd-chart-pipeline', 'Leads por funil', resp.data.charts.by_pipeline || {}, pipelineFilter);
         });
     }
 
