@@ -1,5 +1,23 @@
 (function ($) {
     const charts = {};
+    const CHART_COLORS = {
+        bu: ['#2563eb', '#1d4ed8', '#1e40af', '#3730a3', '#4338ca', '#64748b'],
+        origem: ['#06b6d4', '#0ea5e9', '#0891b2', '#14b8a6', '#64748b'],
+        status: ['#8b5cf6', '#7c3aed', '#6366f1', '#a855f7', '#64748b'],
+        faixa: ['#f59e0b', '#d97706', '#f97316', '#fb7185', '#64748b'],
+        pipeline: ['#10b981', '#059669', '#0d9488', '#14b8a6', '#64748b'],
+        day: ['#2563eb'],
+    };
+    const CARD_ICONS = {
+        'Total de leads': '📈',
+        'Leads no período': '🗓️',
+        'Leads qualificados': '✅',
+        'Leads desqualificados': '🚫',
+        'Reuniões agendadas': '📅',
+        'Acima de R$ 20M/ano': '💎',
+        'Leads por BU': '🏢',
+        'Leads por origem': '🧭',
+    };
 
     function escapeHtml(value) {
         return String(value || '')
@@ -18,6 +36,15 @@
         };
     }
 
+    function chartKindById(id) {
+        if (id.includes('origem')) return 'origem';
+        if (id.includes('status')) return 'status';
+        if (id.includes('faixa')) return 'faixa';
+        if (id.includes('pipeline')) return 'pipeline';
+        if (id.includes('bu')) return 'bu';
+        return 'day';
+    }
+
     function renderChart(id, title, map) {
         const canvas = document.getElementById(id);
         if (!canvas || typeof Chart === 'undefined') {
@@ -25,41 +52,82 @@
         }
 
         const ds = toDataset(map);
+        const kind = chartKindById(id);
+        const palette = CHART_COLORS[kind] || CHART_COLORS.day;
+        const isLine = id === 'okd-chart-day';
+        const barColors = ds.labels.map((_, i) => palette[i % palette.length]);
+
         if (charts[id]) {
             charts[id].destroy();
         }
 
         charts[id] = new Chart(canvas.getContext('2d'), {
-            type: 'bar',
+            type: isLine ? 'line' : 'bar',
             data: {
                 labels: ds.labels,
-                datasets: [{ label: title, data: ds.data }],
+                datasets: [{
+                    label: title,
+                    data: ds.data,
+                    backgroundColor: isLine ? 'rgba(37, 99, 235, 0.1)' : barColors,
+                    borderColor: isLine ? '#2563eb' : barColors,
+                    borderWidth: 2,
+                    fill: isLine,
+                    tension: 0.3,
+                    pointRadius: isLine ? 3 : 0,
+                    maxBarThickness: 36,
+                }],
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false },
+                    tooltip: { mode: 'index', intersect: false },
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#475467', maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(148, 163, 184, 0.2)' },
+                        ticks: { color: '#667085', precision: 0 },
+                    },
                 },
             },
         });
+    }
+
+    function summarizeMap(map) {
+        const entries = Object.entries(map || {});
+        if (!entries.length) return 'Sem dados';
+        return entries.slice(0, 2).map(([k, v]) => `${k}: ${v}`).join(' • ');
+    }
+
+    function cardHtml(title, value, subtitle) {
+        const icon = CARD_ICONS[title] || '•';
+        return `<article class="okd-card">
+            <div class="okd-card-head"><span class="okd-card-icon">${icon}</span> ${escapeHtml(title)}</div>
+            <div class="okd-card-value">${escapeHtml(value || 0)}</div>
+            <div class="okd-card-sub">${escapeHtml(subtitle || '')}</div>
+        </article>`;
     }
 
     function renderCards(cards) {
         const el = $('#okd-cards');
         if (!el.length) return;
 
-        const basic = {
-            'Total de leads': cards.total,
-            'Leads no período': cards.periodo,
-            'Leads qualificados': cards.qualificados,
-            'Leads desqualificados': cards.desqualificados,
-            'Reuniões agendadas': cards.agendados,
-            'Acima de R$ 20M/ano': cards.acima_20m,
-        };
-
-        const items = Object.entries(basic).map(([k, v]) => `<div class="okd-card"><strong>${escapeHtml(k)}</strong><span>${escapeHtml(v || 0)}</span></div>`);
-        items.push(`<div class="okd-card"><strong>Leads por BU</strong><span>${escapeHtml(JSON.stringify(cards.por_bu || {}))}</span></div>`);
-        items.push(`<div class="okd-card"><strong>Leads por origem</strong><span>${escapeHtml(JSON.stringify(cards.por_origem || {}))}</span></div>`);
+        const items = [
+            cardHtml('Total de leads', cards.total, 'Base completa de leads sincronizados'),
+            cardHtml('Leads no período', cards.periodo, 'Resultado conforme filtros aplicados'),
+            cardHtml('Leads qualificados', cards.qualificados, 'Leads prontos para avanço comercial'),
+            cardHtml('Leads desqualificados', cards.desqualificados, 'Leads encerrados sem potencial'),
+            cardHtml('Reuniões agendadas', cards.agendados, 'Status com reunião marcada'),
+            cardHtml('Acima de R$ 20M/ano', cards.acima_20m, 'Leads HIGH VALUE'),
+            cardHtml('Leads por BU', Object.keys(cards.por_bu || {}).length, summarizeMap(cards.por_bu)),
+            cardHtml('Leads por origem', Object.keys(cards.por_origem || {}).length, summarizeMap(cards.por_origem)),
+        ];
 
         el.html(items.join(''));
     }
