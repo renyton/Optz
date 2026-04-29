@@ -14,6 +14,16 @@
     --okd-space-4: 24px;
 }
 
+#optimize-kommo-dashboard.okd-theme-dark {
+    --okd-bg: #0b1220;
+    --okd-surface: #111a2d;
+    --okd-border: #233252;
+    --okd-text: #e5e7eb;
+    --okd-muted: #9ca3af;
+    --okd-primary: #60a5fa;
+    --okd-primary-soft: rgba(96, 165, 250, 0.2);
+}
+
 #optimize-kommo-dashboard {
     font-family: Inter, "Segoe UI", Arial, sans-serif;
     color: var(--okd-text);
@@ -65,6 +75,10 @@
     font-size: 13px;
     position: static;
     z-index: 1;
+}
+
+#okd-theme-toggle {
+    margin-right: 10px;
 }
 
 .okd-login-wrap {

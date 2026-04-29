@@ -2,11 +2,11 @@
     const charts = {};
     const chartState = {};
     const CHART_COLORS = {
-        bu: ['#2563eb', '#1d4ed8', '#1e40af', '#3730a3', '#4338ca', '#64748b'],
-        origem: ['#06b6d4', '#0ea5e9', '#0891b2', '#14b8a6', '#64748b'],
-        status: ['#8b5cf6', '#7c3aed', '#6366f1', '#a855f7', '#64748b'],
-        faixa: ['#f59e0b', '#d97706', '#f97316', '#fb7185', '#64748b'],
-        pipeline: ['#10b981', '#059669', '#0d9488', '#14b8a6', '#64748b'],
+        bu: ['#1d4ed8', '#f59e0b', '#16a34a', '#ef4444', '#7c3aed', '#06b6d4', '#f97316', '#84cc16'],
+        origem: ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#0ea5e9', '#e11d48', '#14b8a6'],
+        status: ['#0ea5e9', '#f97316', '#8b5cf6', '#22c55e', '#ef4444', '#eab308', '#14b8a6', '#f43f5e', '#6366f1'],
+        faixa: ['#f59e0b', '#22c55e', '#3b82f6', '#ef4444', '#a855f7', '#06b6d4', '#84cc16', '#f97316'],
+        pipeline: ['#06b6d4', '#e11d48', '#84cc16', '#f59e0b', '#8b5cf6', '#3b82f6', '#14b8a6', '#f97316'],
         day: ['#2563eb'],
     };
     const CARD_ICONS = {
@@ -408,6 +408,23 @@
     });
 
     $(document).ready(function () {
+        const themeStorageKey = 'okd_theme';
+        const dashboardEl = document.getElementById('optimize-kommo-dashboard');
+        if (dashboardEl) {
+            const savedTheme = localStorage.getItem(themeStorageKey) || 'light';
+            if ('dark' === savedTheme) {
+                dashboardEl.classList.add('okd-theme-dark');
+                $('#okd-theme-toggle').text('Modo claro');
+            }
+        }
+
+        $(document).on('click', '#okd-theme-toggle', function () {
+            if (!dashboardEl) return;
+            const isDark = dashboardEl.classList.toggle('okd-theme-dark');
+            localStorage.setItem(themeStorageKey, isDark ? 'dark' : 'light');
+            $(this).text(isDark ? 'Modo claro' : 'Modo escuro');
+        });
+
         loadDashboard();
     });
 })(jQuery);
