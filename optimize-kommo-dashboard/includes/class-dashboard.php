@@ -254,7 +254,7 @@ class Optimize_Kommo_Dashboard
 
         $rows = $wpdb->get_results(
             self::prepare_query(
-                "SELECT lead_name, created_at, responsible_user, pipeline_name, status_name, bu, origem, faixa_faturamento, link_relatorio, loss_reason_name, non_advance_category {$base_sql} ORDER BY created_at DESC",
+                "SELECT lead_name, created_at, responsible_user, pipeline_name, status_name, bu, origem, faixa_faturamento, link_relatorio, loss_reason_name, non_advance_category, meeting_scheduled_at, time_to_meeting_minutes, time_to_meeting_source {$base_sql} ORDER BY created_at DESC",
                 $params
             ),
             ARRAY_A
@@ -269,6 +269,8 @@ class Optimize_Kommo_Dashboard
         $base_recuperacao = 0;
         $sem_motivo_identificado = 0;
         $total_nao_avancaram = 0;
+        $meeting_minutes = [];
+        $leads_sem_reuniao = 0;
 
         foreach ($rows as $row) {
             if (self::is_qualified_lead($row)) {
@@ -288,16 +290,33 @@ class Optimize_Kommo_Dashboard
             }
 
             $category = (string) ($row['non_advance_category'] ?? '');
+            $loss_reason_name = (string) ($row['loss_reason_name'] ?? '');
             if ('NÃO AVANÇOU' === mb_strtoupper((string) ($row['status_name'] ?? ''), 'UTF-8')) {
                 $total_nao_avancaram++;
             }
-            if ('Desqualificado por faturamento' === $category) {
+            if (self::is_desqualificado_por_faturamento_row($row, $category, $loss_reason_name)) {
                 $desqualificados_faturamento++;
-            } elseif ('Base de recuperação' === $category) {
+            } elseif (self::is_base_recuperacao_row($row, $category, $loss_reason_name)) {
                 $base_recuperacao++;
             } elseif ('Não avançou - sem motivo identificado' === $category) {
                 $sem_motivo_identificado++;
             }
+
+            $minutes = isset($row['time_to_meeting_minutes']) ? (int) $row['time_to_meeting_minutes'] : 0;
+            if ($minutes > 0) {
+                $meeting_minutes[] = $minutes;
+            } else {
+                $leads_sem_reuniao++;
+            }
+        }
+        sort($meeting_minutes);
+        $meeting_avg = ! empty($meeting_minutes) ? round(array_sum($meeting_minutes) / count($meeting_minutes), 2) : 0;
+        $meeting_min = ! empty($meeting_minutes) ? min($meeting_minutes) : 0;
+        $meeting_max = ! empty($meeting_minutes) ? max($meeting_minutes) : 0;
+        $meeting_median = 0;
+        if (! empty($meeting_minutes)) {
+            $mid = (int) floor(count($meeting_minutes) / 2);
+            $meeting_median = (count($meeting_minutes) % 2) ? $meeting_minutes[$mid] : round(($meeting_minutes[$mid - 1] + $meeting_minutes[$mid]) / 2, 2);
         }
 
         $charts = [
@@ -346,6 +365,7 @@ class Optimize_Kommo_Dashboard
                     'periodo'        => $total,
                     'qualificados'   => $qualificados,
                     'desqualificados'=> $desqualificados,
+                    'leads_desqualificados'=> $desqualificados,
                     'agendados'      => $agendados,
                     'acima_20m'      => $acima_20m,
                     'desqualificados_faturamento' => $desqualificados_faturamento,
@@ -353,6 +373,11 @@ class Optimize_Kommo_Dashboard
                     'sem_motivo_identificado' => $sem_motivo_identificado,
                     'total_nao_avancaram' => $total_nao_avancaram,
                     'por_origem'     => $charts['by_origem'],
+                    'meeting_avg_minutes' => $meeting_avg,
+                    'meeting_median_minutes' => $meeting_median,
+                    'meeting_min_minutes' => $meeting_min,
+                    'meeting_max_minutes' => $meeting_max,
+                    'leads_sem_reuniao' => $leads_sem_reuniao,
                 ],
                 'charts' => $charts,
                 'table'  => $table_rows,
@@ -481,6 +506,31 @@ class Optimize_Kommo_Dashboard
         $revenue = self::estimate_revenue_value((string) ($row['faixa_faturamento'] ?? ''));
 
         return $revenue > 0 && $revenue < 1000000;
+    }
+
+    private static function is_desqualificado_por_faturamento_row(array $row, $category, $loss_reason_name)
+    {
+        if ('NÃO AVANÇOU' !== mb_strtoupper((string) ($row['status_name'] ?? ''), 'UTF-8')) {
+            return false;
+        }
+        if ('Desqualificado por faturamento' === $category) {
+            return true;
+        }
+        if (self::estimate_revenue_value((string) ($row['faixa_faturamento'] ?? '')) > 0 && self::estimate_revenue_value((string) ($row['faixa_faturamento'] ?? '')) < 1000000) {
+            return true;
+        }
+        return self::contains_keyword($loss_reason_name, ['abaixo de 1 milhao', 'abaixo de 1 milhão', 'menor que 1 milhao', 'menor que 1 milhão', 'menos de 1 milhao', 'menos de 1 milhão', 'faturamento abaixo', 'baixa receita', 'baixo faturamento']);
+    }
+
+    private static function is_base_recuperacao_row(array $row, $category, $loss_reason_name)
+    {
+        if ('NÃO AVANÇOU' !== mb_strtoupper((string) ($row['status_name'] ?? ''), 'UTF-8')) {
+            return false;
+        }
+        if ('Base de recuperação' === $category) {
+            return true;
+        }
+        return self::contains_keyword($loss_reason_name, ['sem resposta', 'sem retorno', 'não respondeu', 'nao respondeu', 'não interagiu', 'nao interagiu', 'fup sem resposta', 'follow up sem resposta', 'base de recuperação', 'base de recuperacao']);
     }
 
     private static function estimate_revenue_value($raw_value)

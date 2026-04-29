@@ -28,6 +28,7 @@ class Optimize_Kommo_Normalizer
         $loss_reason_id = absint($lead['loss_reason_id'] ?? 0);
         $loss_reason_name = sanitize_text_field((string) ($lookups['loss_reasons'][$loss_reason_id] ?? ''));
         $non_advance_category = self::classify_non_advance_category($pipeline_name, $status_name, $faixa_faturamento, $loss_reason_name);
+        $meeting_data = self::extract_meeting_time_data($status_name, $created, $updated);
 
         $debug_payload = [
             'lead_id' => absint($lead['id'] ?? 0),
@@ -54,6 +55,11 @@ class Optimize_Kommo_Normalizer
             'loss_reason_id'     => $loss_reason_id,
             'loss_reason_name'   => $loss_reason_name,
             'non_advance_category' => $non_advance_category,
+            'meeting_scheduled_at' => $meeting_data['meeting_scheduled_at'],
+            'time_to_meeting_minutes' => $meeting_data['time_to_meeting_minutes'],
+            'time_to_meeting_hours' => $meeting_data['time_to_meeting_hours'],
+            'time_to_meeting_days' => $meeting_data['time_to_meeting_days'],
+            'time_to_meeting_source' => $meeting_data['time_to_meeting_source'],
             'score_diagnostico'  => sanitize_text_field((string) ($custom_fields['Score Diagnóstico'] ?? '')),
             'setor_atuacao'      => sanitize_text_field((string) ($custom_fields['Setor Atuação'] ?? '')),
             'link_relatorio'     => esc_url_raw((string) ($custom_fields['Link Relatório'] ?? '')),
@@ -185,7 +191,7 @@ class Optimize_Kommo_Normalizer
         $reason = self::normalize_text($loss_reason_name);
         $revenue = self::estimate_revenue_value($faixa_faturamento);
 
-        $low_revenue_keywords = ['faturamento baixo', 'baixo faturamento', 'abaixo de 1', 'menos de 1'];
+        $low_revenue_keywords = ['abaixo de 1 milhao', 'abaixo de 1 milhão', 'menor que 1 milhao', 'menor que 1 milhão', 'menos de 1 milhao', 'menos de 1 milhão', 'faturamento abaixo', 'baixa receita', 'baixo faturamento'];
         foreach ($low_revenue_keywords as $keyword) {
             if (false !== strpos($reason, self::normalize_text($keyword))) {
                 return 'Desqualificado por faturamento';
@@ -196,7 +202,7 @@ class Optimize_Kommo_Normalizer
             return 'Desqualificado por faturamento';
         }
 
-        $recovery_keywords = ['nao respondeu', 'não respondeu', 'sem retorno', 'follow-up sem resposta', 'fup sem respostas', 'base de recuperacao', 'base de recuperação', 'sem interacao', 'sem interação'];
+        $recovery_keywords = ['sem resposta', 'sem retorno', 'nao respondeu', 'não respondeu', 'nao interagiu', 'não interagiu', 'fup sem resposta', 'follow up sem resposta', 'base de recuperacao', 'base de recuperação'];
         foreach ($recovery_keywords as $keyword) {
             if (false !== strpos($reason, self::normalize_text($keyword))) {
                 return 'Base de recuperação';
@@ -208,5 +214,46 @@ class Optimize_Kommo_Normalizer
         }
 
         return 'Não avançou - sem motivo identificado';
+    }
+
+    private static function extract_meeting_time_data($status_name, $created_at, $updated_at)
+    {
+        $status_normalized = self::normalize_text($status_name);
+        $meeting_statuses = [
+            self::normalize_text('CLOSER - REUNIÃO AGENDADA'),
+            self::normalize_text('SDR - AGENDADO COM O SDR'),
+        ];
+
+        if (! in_array($status_normalized, $meeting_statuses, true) || empty($created_at) || empty($updated_at)) {
+            return [
+                'meeting_scheduled_at' => null,
+                'time_to_meeting_minutes' => null,
+                'time_to_meeting_hours' => null,
+                'time_to_meeting_days' => null,
+                'time_to_meeting_source' => 'unavailable',
+            ];
+        }
+
+        $created_ts = strtotime((string) $created_at);
+        $updated_ts = strtotime((string) $updated_at);
+        if (! $created_ts || ! $updated_ts || $updated_ts < $created_ts) {
+            return [
+                'meeting_scheduled_at' => null,
+                'time_to_meeting_minutes' => null,
+                'time_to_meeting_hours' => null,
+                'time_to_meeting_days' => null,
+                'time_to_meeting_source' => 'unavailable',
+            ];
+        }
+
+        $minutes = (int) round(($updated_ts - $created_ts) / 60);
+
+        return [
+            'meeting_scheduled_at' => gmdate('Y-m-d H:i:s', $updated_ts),
+            'time_to_meeting_minutes' => $minutes,
+            'time_to_meeting_hours' => round($minutes / 60, 2),
+            'time_to_meeting_days' => round($minutes / 1440, 2),
+            'time_to_meeting_source' => 'estimated_updated_at',
+        ];
     }
 }

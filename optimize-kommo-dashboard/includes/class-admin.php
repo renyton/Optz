@@ -99,6 +99,16 @@ class Optimize_Kommo_Admin
         $last_sync = get_option('optimize_kommo_last_sync', __('Nunca', 'optimize-kommo-dashboard'));
         $oauth_callback = admin_url('admin-post.php?action=optimize_kommo_oauth_callback');
         $oauth_debug = get_option('optimize_kommo_oauth_debug', []);
+        $leads_table = Optimize_Kommo_DB::leads_table();
+        $dashboard_debug_counts = [
+            'nao_avancou' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$leads_table} WHERE UPPER(status_name) = 'NÃO AVANÇOU'"),
+            'loss_reason_name' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$leads_table} WHERE TRIM(COALESCE(loss_reason_name, '')) <> ''"),
+            'non_advance_category' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$leads_table} WHERE TRIM(COALESCE(non_advance_category, '')) <> ''"),
+            'faturamento_baixo_1m' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$leads_table} WHERE faixa_faturamento REGEXP '(abaixo|menos|menor|0[,\\.]?[0-9]?\\s*mi|[1-9][0-9]{1,5})'"),
+            'desqualificado_faturamento' => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$leads_table} WHERE non_advance_category = %s", 'Desqualificado por faturamento')),
+            'base_recuperacao' => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$leads_table} WHERE non_advance_category = %s", 'Base de recuperação')),
+            'sem_motivo_identificado' => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$leads_table} WHERE non_advance_category = %s", 'Não avançou - sem motivo identificado')),
+        ];
         $dashboard_users = get_users(
             [
                 'role__in' => ['optimize_dashboard_viewer', 'administrator'],

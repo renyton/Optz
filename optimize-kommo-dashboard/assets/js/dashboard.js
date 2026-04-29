@@ -220,6 +220,16 @@
         </article>`;
     }
 
+    function formatMinutes(minutes) {
+        const value = Number(minutes || 0);
+        if (!value) return '0 min';
+        if (value < 60) return `${value} min`;
+        if (value < 1440) return `${Math.floor(value / 60)}h ${value % 60}min`;
+        const days = Math.floor(value / 1440);
+        const hours = Math.floor((value % 1440) / 60);
+        return `${days}d ${hours}h`;
+    }
+
     function renderCards(cards) {
         const el = $('#okd-cards');
         if (!el.length) return;
@@ -234,6 +244,10 @@
             cardHtml('Desqualificados por faturamento', cards.desqualificados_faturamento, 'Não avançaram por baixa receita'),
             cardHtml('Base de recuperação', cards.base_recuperacao, 'Leads sem retorno/interação'),
             cardHtml('Não avançaram sem motivo', cards.sem_motivo_identificado, 'Sem razão identificada na Kommo'),
+            cardHtml('Total de não avançaram', cards.total_nao_avancaram, 'Status NÃO AVANÇOU'),
+            cardHtml('Tempo médio até reunião', formatMinutes(cards.meeting_avg_minutes), 'Estimado por updated_at'),
+            cardHtml('Tempo mediano até reunião', formatMinutes(cards.meeting_median_minutes), 'Estimado por updated_at'),
+            cardHtml('Leads sem reunião', cards.leads_sem_reuniao, 'Sem status agendado'),
             cardHtml('Leads por origem', Object.keys(cards.por_origem || {}).length, summarizeMap(cards.por_origem)),
         ];
 

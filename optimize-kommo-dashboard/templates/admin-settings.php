@@ -98,6 +98,19 @@
         </table>
     <?php endif; ?>
 
+    <h2><?php esc_html_e('Debug KPIs Dashboard', 'optimize-kommo-dashboard'); ?></h2>
+    <table class="widefat striped">
+        <tbody>
+            <tr><th>Leads com status NÃO AVANÇOU</th><td><?php echo esc_html((string) ($dashboard_debug_counts['nao_avancou'] ?? 0)); ?></td></tr>
+            <tr><th>Leads com loss_reason_name preenchido</th><td><?php echo esc_html((string) ($dashboard_debug_counts['loss_reason_name'] ?? 0)); ?></td></tr>
+            <tr><th>Leads com non_advance_category preenchido</th><td><?php echo esc_html((string) ($dashboard_debug_counts['non_advance_category'] ?? 0)); ?></td></tr>
+            <tr><th>Leads com faixa abaixo de 1M (aprox.)</th><td><?php echo esc_html((string) ($dashboard_debug_counts['faturamento_baixo_1m'] ?? 0)); ?></td></tr>
+            <tr><th>Desqualificado por faturamento</th><td><?php echo esc_html((string) ($dashboard_debug_counts['desqualificado_faturamento'] ?? 0)); ?></td></tr>
+            <tr><th>Base de recuperação</th><td><?php echo esc_html((string) ($dashboard_debug_counts['base_recuperacao'] ?? 0)); ?></td></tr>
+            <tr><th>Não avançou - sem motivo identificado</th><td><?php echo esc_html((string) ($dashboard_debug_counts['sem_motivo_identificado'] ?? 0)); ?></td></tr>
+        </tbody>
+    </table>
+
     <p>
         <button type="button" class="button button-primary" id="optimize-kommo-sync-now"><?php esc_html_e('Sincronizar agora', 'optimize-kommo-dashboard'); ?></button>
         <span id="optimize-kommo-sync-feedback"></span>
