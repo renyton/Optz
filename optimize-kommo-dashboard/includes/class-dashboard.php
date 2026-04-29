@@ -246,7 +246,7 @@ class Optimize_Kommo_Dashboard
 
             $category = (string) ($row['non_advance_category'] ?? '');
             $loss_reason_name = (string) ($row['loss_reason_name'] ?? '');
-            if ('NÃO AVANÇOU' === mb_strtoupper((string) ($row['status_name'] ?? ''), 'UTF-8')) {
+            if (self::is_lost_or_non_advanced_status((string) ($row['status_name'] ?? ''))) {
                 $total_nao_avancaram++;
             }
             if (self::is_desqualificado_por_faturamento_row($row, $category, $loss_reason_name)) {
@@ -315,11 +315,22 @@ class Optimize_Kommo_Dashboard
         update_option('optimize_kommo_dashboard_last_debug', [
             'total_leads_filtrados' => $total,
             'total_nao_avancou' => $total_nao_avancaram,
+            'total_venda_perdida' => count(array_filter($rows, static function ($r) { return false !== stripos((string) ($r['status_name'] ?? ''), 'venda perdida'); })),
             'total_com_loss_reason' => count(array_filter($rows, static function ($r) { return '' !== trim((string) ($r['loss_reason_name'] ?? '')); })),
             'total_com_non_advance_category' => count(array_filter($rows, static function ($r) { return '' !== trim((string) ($r['non_advance_category'] ?? '')); })),
             'total_desqualificados' => $desqualificados_faturamento,
             'total_base_recuperacao' => $base_recuperacao,
             'updated_at' => current_time('mysql'),
+            'sample_leads' => array_slice(array_map(static function ($r) {
+                return [
+                    'lead_name' => (string) ($r['lead_name'] ?? ''),
+                    'pipeline_name' => (string) ($r['pipeline_name'] ?? ''),
+                    'status_name' => (string) ($r['status_name'] ?? ''),
+                    'faixa_faturamento' => (string) ($r['faixa_faturamento'] ?? ''),
+                    'loss_reason_name' => (string) ($r['loss_reason_name'] ?? ''),
+                    'non_advance_category' => (string) ($r['non_advance_category'] ?? ''),
+                ];
+            }, $rows), 0, 20),
         ]);
 
         wp_send_json_success(
@@ -358,6 +369,7 @@ class Optimize_Kommo_Dashboard
                     'lossReasons' => (array) ($filter_options['loss_reason_name'] ?? []),
                     'nonAdvanceCategories' => (array) ($filter_options['non_advance_category'] ?? []),
                 ],
+                'metricsDebug' => get_option('optimize_kommo_dashboard_last_debug', []),
             ]
         );
     }
@@ -521,7 +533,7 @@ class Optimize_Kommo_Dashboard
 
     private static function is_desqualificado_por_faturamento_row(array $row, $category, $loss_reason_name)
     {
-        if ('NÃO AVANÇOU' !== mb_strtoupper((string) ($row['status_name'] ?? ''), 'UTF-8')) {
+        if (! self::is_lost_or_non_advanced_status((string) ($row['status_name'] ?? ''))) {
             return false;
         }
         if ('Desqualificado por faturamento' === $category) {
@@ -530,18 +542,23 @@ class Optimize_Kommo_Dashboard
         if (self::estimate_revenue_value((string) ($row['faixa_faturamento'] ?? '')) > 0 && self::estimate_revenue_value((string) ($row['faixa_faturamento'] ?? '')) < 1000000) {
             return true;
         }
-        return self::contains_keyword($loss_reason_name, ['abaixo de 1 milhao', 'abaixo de 1 milhão', 'menor que 1 milhao', 'menor que 1 milhão', 'menos de 1 milhao', 'menos de 1 milhão', 'faturamento abaixo', 'baixa receita', 'baixo faturamento']);
+        return self::contains_keyword($loss_reason_name, ['fora do target', 'abaixo', 'menor', 'faturamento', 'receita']);
     }
 
     private static function is_base_recuperacao_row(array $row, $category, $loss_reason_name)
     {
-        if ('NÃO AVANÇOU' !== mb_strtoupper((string) ($row['status_name'] ?? ''), 'UTF-8')) {
+        if (! self::is_lost_or_non_advanced_status((string) ($row['status_name'] ?? ''))) {
             return false;
         }
         if ('Base de recuperação' === $category) {
             return true;
         }
         return self::contains_keyword($loss_reason_name, ['sem resposta', 'sem retorno', 'não respondeu', 'nao respondeu', 'não interagiu', 'nao interagiu', 'fup sem resposta', 'follow up sem resposta', 'base de recuperação', 'base de recuperacao']);
+    }
+
+    private static function is_lost_or_non_advanced_status($status_name)
+    {
+        return self::contains_keyword($status_name, ['não avançou', 'nao avancou', 'venda perdida', 'perdido', 'lost']);
     }
 
     private static function estimate_revenue_value($raw_value)

@@ -57,6 +57,7 @@
     </div>
 
     <div class="okd-cards" id="okd-cards"></div>
+    <div class="okd-surface okd-debug-metrics" id="okd-debug-metrics"></div>
 
     <div class="okd-charts">
         <section class="okd-surface okd-chart-card">

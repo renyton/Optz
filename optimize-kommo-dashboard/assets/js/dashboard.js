@@ -254,6 +254,20 @@
         el.html(items.join(''));
     }
 
+    function renderMetricsDebug(debugData) {
+        const el = $('#okd-debug-metrics');
+        if (!el.length) return;
+        const d = debugData || {};
+        const rows = (d.sample_leads || []).map((r) => `<tr><td>${escapeHtml(r.lead_name)}</td><td>${escapeHtml(r.pipeline_name)}</td><td>${escapeHtml(r.status_name)}</td><td>${escapeHtml(r.faixa_faturamento)}</td><td>${escapeHtml(r.loss_reason_name)}</td><td>${escapeHtml(r.non_advance_category)}</td></tr>`).join('');
+        el.html(`<h3>Debug de métricas</h3>
+            <p>total de leads carregados na tabela: <strong>${escapeHtml(d.total_leads_filtrados ?? 0)}</strong></p>
+            <p>total status_name = "NÃO AVANÇOU": <strong>${escapeHtml(d.total_nao_avancou ?? 0)}</strong></p>
+            <p>total status_name = "Venda perdida": <strong>${escapeHtml(d.total_venda_perdida ?? 0)}</strong></p>
+            <p>total com loss_reason_name preenchido: <strong>${escapeHtml(d.total_com_loss_reason ?? 0)}</strong></p>
+            <p>total com non_advance_category preenchido: <strong>${escapeHtml(d.total_com_non_advance_category ?? 0)}</strong></p>
+            <table class="okd-sheet-table"><thead><tr><th>Lead</th><th>Funil</th><th>Status</th><th>Faixa</th><th>Motivo</th><th>Categoria</th></tr></thead><tbody>${rows || '<tr><td colspan="6">Sem dados</td></tr>'}</tbody></table>`);
+    }
+
     function renderTable(rows, activePipeline) {
         const tbody = $('#okd-table tbody');
         if (!tbody.length) return;
@@ -341,6 +355,7 @@
             renderFilterOptions(resp.data.filter_options || {}, payload);
 
             renderCards(resp.data.cards || {});
+            renderMetricsDebug(resp.data.metricsDebug || {});
             renderTable(resp.data.table || [], pipelineFilter);
 
             renderChart('okd-chart-day', 'Leads por dia', resp.data.charts.by_day || {}, pipelineFilter);

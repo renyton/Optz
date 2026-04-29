@@ -239,6 +239,10 @@
     color: var(--okd-muted);
 }
 
+.okd-debug-metrics {
+    padding: 16px;
+}
+
 .okd-sheet-table {
     width: 100%;
     border-collapse: collapse;
