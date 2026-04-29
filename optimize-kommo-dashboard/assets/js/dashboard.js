@@ -233,7 +233,8 @@
     function renderCards(cards) {
         const main = $('#okd-cards-main');
         const quality = $('#okd-cards-quality');
-        if (!main.length || !quality.length) return;
+        const legacy = $('#okd-cards');
+        if ((!main.length || !quality.length) && !legacy.length) return;
         const conversion = (Number(cards.periodo || 0) > 0) ? ((Number(cards.agendados || 0) / Number(cards.periodo || 1)) * 100).toFixed(2) + '%' : '0%';
 
         const mainItems = [
@@ -249,8 +250,12 @@
             cardHtml('Base de recuperação', cards.base_recuperacao, 'Leads sem retorno/interação'),
             cardHtml('Não avançaram sem motivo', cards.sem_motivo_identificado, 'Sem razão identificada na Kommo'),
         ];
-        main.html(mainItems.join(''));
-        quality.html(qualityItems.join(''));
+        if (main.length && quality.length) {
+            main.html(mainItems.join(''));
+            quality.html(qualityItems.join(''));
+        } else if (legacy.length) {
+            legacy.html(mainItems.concat(qualityItems).join(''));
+        }
     }
 
     function renderMetricsDebug(debugData) {

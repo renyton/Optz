@@ -171,6 +171,7 @@
 .okd-chart-funnel { grid-column: span 12; }
 .okd-debug-toggle-wrap { grid-column: 1 / -1; text-align: right; }
 .okd-debug-metrics { grid-column: 1 / -1; display: none; }
+#okd-toggle-debug { display: none; }
 .okd-charts { grid-column: 1 / -1; }
 .okd-chart-card { grid-column: span 6; }
 .okd-charts .okd-chart-card canvas { min-height: 280px; }
