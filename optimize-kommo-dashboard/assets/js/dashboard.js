@@ -258,8 +258,10 @@
         if (!el.length) return;
         if (!(typeof OptimizeKommoDashboard !== 'undefined' && OptimizeKommoDashboard.isAdmin)) {
             el.hide();
+            $('#okd-toggle-debug').hide();
             return;
         }
+        $('#okd-toggle-debug').show();
         const d = debugData || {};
         const rows = (d.sample_leads || []).map((r) => `<tr><td>${escapeHtml(r.lead_name)}</td><td>${escapeHtml(r.pipeline_name)}</td><td>${escapeHtml(r.status_name)}</td><td>${escapeHtml(r.faixa_faturamento)}</td><td>${escapeHtml(r.loss_reason_name)}</td><td>${escapeHtml(r.non_advance_category)}</td></tr>`).join('');
         el.html(`<h3>Debug de métricas</h3>
@@ -378,6 +380,10 @@
         if (!chartId || !chartState[chartId]) return;
         const state = chartState[chartId];
         renderChart(chartId, state.title, state.map, state.activePipeline);
+    });
+
+    $(document).on('click', '#okd-toggle-debug', function () {
+        $('#okd-debug-metrics').toggle();
     });
 
     $(document).on('click', '#optimize-kommo-sync-now', function () {

@@ -12,7 +12,7 @@
     <div class="okd-topbar">
         <a class="okd-btn-logout" href="<?php echo esc_url(wp_logout_url(Optimize_Kommo_Dashboard::get_login_page_url())); ?>">Sair</a>
     </div>
-    <div class="okd-surface okd-filters-bar">
+    <div class="okd-surface okd-filters-bar okd-grid-full">
         <div class="okd-filter">
             <label for="okd-date-start">Data inicial</label>
             <input type="date" id="okd-date-start" />
@@ -56,18 +56,19 @@
         <button id="okd-apply-filters" class="okd-btn-primary">Aplicar filtros</button>
     </div>
 
-    <section class="okd-kpi-section">
+    <section class="okd-kpi-section okd-grid-full">
         <h2>SEÇÃO 1 – KPIs principais</h2>
-        <div class="okd-cards" id="okd-cards-main"></div>
+        <div class="okd-cards okd-cards-main" id="okd-cards-main"></div>
     </section>
-    <section class="okd-kpi-section">
+    <section class="okd-kpi-section okd-grid-full">
         <h2>SEÇÃO 2 – Qualidade do funil</h2>
-        <div class="okd-cards" id="okd-cards-quality"></div>
+        <div class="okd-cards okd-cards-quality" id="okd-cards-quality"></div>
     </section>
+    <div class="okd-debug-toggle-wrap"><button type="button" id="okd-toggle-debug" class="button">Modo debug</button></div>
     <div class="okd-surface okd-debug-metrics" id="okd-debug-metrics"></div>
 
-    <div class="okd-charts">
-        <section class="okd-surface okd-chart-card okd-chart-large">
+    <div class="okd-charts okd-grid-full">
+        <section class="okd-surface okd-chart-card okd-chart-funnel">
             <div class="okd-chart-head"><h3>SEÇÃO 3 – Funil SDR | Grupo Optimize</h3><select class="okd-chart-type" data-chart-id="okd-chart-funnel-main"><option value="bar">Barra</option><option value="line">Linha</option><option value="table">Planilha</option></select></div>
             <canvas id="okd-chart-funnel-main"></canvas><div id="okd-sheet-funnel-main" class="okd-chart-sheet"></div>
         </section>
@@ -85,8 +86,8 @@
         </section>
     </div>
 
-    <h2>SEÇÃO 5 – Execução</h2>
-    <div class="okd-surface okd-table-wrap">
+    <h2 class="okd-grid-full">SEÇÃO 5 – Execução</h2>
+    <div class="okd-surface okd-table-wrap okd-grid-full">
         <table class="okd-table" id="okd-table">
             <thead>
                 <tr>
