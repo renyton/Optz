@@ -56,44 +56,36 @@
         <button id="okd-apply-filters" class="okd-btn-primary">Aplicar filtros</button>
     </div>
 
-    <div class="okd-cards" id="okd-cards"></div>
+    <section class="okd-kpi-section">
+        <h2>SEÇÃO 1 – KPIs principais</h2>
+        <div class="okd-cards" id="okd-cards-main"></div>
+    </section>
+    <section class="okd-kpi-section">
+        <h2>SEÇÃO 2 – Qualidade do funil</h2>
+        <div class="okd-cards" id="okd-cards-quality"></div>
+    </section>
     <div class="okd-surface okd-debug-metrics" id="okd-debug-metrics"></div>
 
     <div class="okd-charts">
-        <section class="okd-surface okd-chart-card">
-            <div class="okd-chart-head"><h3>Leads por dia</h3><select class="okd-chart-type" data-chart-id="okd-chart-day"><option value="bar">Barra</option><option value="line">Linha</option><option value="pie">Pizza</option><option value="doughnut">Rosca</option><option value="table">Planilha</option></select></div>
-            <canvas id="okd-chart-day"></canvas><div id="okd-sheet-day" class="okd-chart-sheet"></div>
+        <section class="okd-surface okd-chart-card okd-chart-large">
+            <div class="okd-chart-head"><h3>SEÇÃO 3 – Funil SDR | Grupo Optimize</h3><select class="okd-chart-type" data-chart-id="okd-chart-funnel-main"><option value="bar">Barra</option><option value="line">Linha</option><option value="table">Planilha</option></select></div>
+            <canvas id="okd-chart-funnel-main"></canvas><div id="okd-sheet-funnel-main" class="okd-chart-sheet"></div>
         </section>
         <section class="okd-surface okd-chart-card">
-            <div class="okd-chart-head"><h3>Leads por origem</h3><select class="okd-chart-type" data-chart-id="okd-chart-origem"><option value="bar">Barra</option><option value="line">Linha</option><option value="pie">Pizza</option><option value="doughnut">Rosca</option><option value="table">Planilha</option></select></div>
-            <canvas id="okd-chart-origem"></canvas><div id="okd-sheet-origem" class="okd-chart-sheet"></div>
-        </section>
-        <section class="okd-surface okd-chart-card">
-            <div class="okd-chart-head"><h3>Leads por BU</h3><select class="okd-chart-type" data-chart-id="okd-chart-bu"><option value="bar">Barra</option><option value="line">Linha</option><option value="pie">Pizza</option><option value="doughnut">Rosca</option><option value="table">Planilha</option></select></div>
-            <canvas id="okd-chart-bu"></canvas><div id="okd-sheet-bu" class="okd-chart-sheet"></div>
-        </section>
-        <section class="okd-surface okd-chart-card">
-            <div class="okd-chart-head"><h3>Leads por faturamento</h3><select class="okd-chart-type" data-chart-id="okd-chart-faixa"><option value="bar">Barra</option><option value="line">Linha</option><option value="pie">Pizza</option><option value="doughnut">Rosca</option><option value="table">Planilha</option></select></div>
-            <canvas id="okd-chart-faixa"></canvas><div id="okd-sheet-faixa" class="okd-chart-sheet"></div>
-        </section>
-        <section class="okd-surface okd-chart-card">
-            <div class="okd-chart-head"><h3>Leads por status</h3><select class="okd-chart-type" data-chart-id="okd-chart-status"><option value="bar">Barra</option><option value="line">Linha</option><option value="pie">Pizza</option><option value="doughnut">Rosca</option><option value="table">Planilha</option></select></div>
-            <canvas id="okd-chart-status"></canvas><div id="okd-sheet-status" class="okd-chart-sheet"></div>
-        </section>
-        <section class="okd-surface okd-chart-card">
-            <div class="okd-chart-head"><h3>Leads por funil</h3><select class="okd-chart-type" data-chart-id="okd-chart-pipeline"><option value="bar">Barra</option><option value="line">Linha</option><option value="pie">Pizza</option><option value="doughnut">Rosca</option><option value="table">Planilha</option></select></div>
-            <canvas id="okd-chart-pipeline"></canvas><div id="okd-sheet-pipeline" class="okd-chart-sheet"></div>
-        </section>
-        <section class="okd-surface okd-chart-card">
-            <div class="okd-chart-head"><h3>Motivos de não avanço</h3><select class="okd-chart-type" data-chart-id="okd-chart-non-advance"><option value="bar">Barra</option><option value="line">Linha</option><option value="pie">Pizza</option><option value="doughnut">Rosca</option><option value="table">Planilha</option></select></div>
-            <canvas id="okd-chart-non-advance"></canvas><div id="okd-sheet-non-advance" class="okd-chart-sheet"></div>
-        </section>
-        <section class="okd-surface okd-chart-card">
-            <div class="okd-chart-head"><h3>Motivos de perda / não avanço</h3><select class="okd-chart-type" data-chart-id="okd-chart-loss-reasons"><option value="bar">Barra</option><option value="pie">Pizza</option><option value="doughnut">Rosca</option><option value="table">Planilha</option></select></div>
+            <div class="okd-chart-head"><h3>SEÇÃO 4 – Motivos de perda</h3><select class="okd-chart-type" data-chart-id="okd-chart-loss-reasons"><option value="bar">Barra</option><option value="pie">Pizza</option><option value="doughnut">Rosca</option><option value="table">Planilha</option></select></div>
             <canvas id="okd-chart-loss-reasons"></canvas><div id="okd-sheet-loss-reasons" class="okd-chart-sheet"></div>
+        </section>
+        <section class="okd-surface okd-chart-card">
+            <div class="okd-chart-head"><h3>SEÇÃO 4 – Tempo até reunião (faixas)</h3><select class="okd-chart-type" data-chart-id="okd-chart-meeting-time"><option value="bar">Barra</option><option value="table">Planilha</option></select></div>
+            <canvas id="okd-chart-meeting-time"></canvas><div id="okd-sheet-meeting-time" class="okd-chart-sheet"></div>
+        </section>
+        <section class="okd-surface okd-chart-card">
+            <div class="okd-chart-head"><h3>SEÇÃO 4 – Origem</h3><select class="okd-chart-type" data-chart-id="okd-chart-origem"><option value="bar">Barra</option><option value="pie">Pizza</option><option value="doughnut">Rosca</option><option value="table">Planilha</option></select></div>
+            <canvas id="okd-chart-origem"></canvas><div id="okd-sheet-origem" class="okd-chart-sheet"></div>
         </section>
     </div>
 
+    <h2>SEÇÃO 5 – Execução</h2>
     <div class="okd-surface okd-table-wrap">
         <table class="okd-table" id="okd-table">
             <thead>

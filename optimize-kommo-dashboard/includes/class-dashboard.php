@@ -79,6 +79,7 @@ class Optimize_Kommo_Dashboard
                 'ajaxUrl' => admin_url('admin-ajax.php'),
                 'nonce'   => wp_create_nonce('optimize_kommo_dashboard_nonce'),
                 'logoutUrl' => wp_logout_url(self::get_login_page_url()),
+                'isAdmin' => current_user_can('manage_options'),
             ]
         );
 
@@ -303,6 +304,16 @@ class Optimize_Kommo_Dashboard
             'loss_reasons' => self::group_count($rows, static function ($row) {
                 $reason = trim((string) ($row['loss_reason_name'] ?? ''));
                 return '' === $reason ? 'Sem motivo informado' : $reason;
+            }),
+            'meeting_time_buckets' => self::group_count($rows, static function ($row) {
+                $m = isset($row['time_to_meeting_minutes']) ? (int) $row['time_to_meeting_minutes'] : 0;
+                if ($m <= 0) { return 'Sem reunião'; }
+                if ($m <= 60) { return 'Até 1 hora'; }
+                if ($m <= 240) { return '1 a 4 horas'; }
+                if ($m <= 1440) { return '4 a 24 horas'; }
+                if ($m <= 4320) { return '1 a 3 dias'; }
+                if ($m <= 10080) { return '3 a 7 dias'; }
+                return 'Acima de 7 dias';
             }),
         ];
 

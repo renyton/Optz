@@ -231,32 +231,35 @@
     }
 
     function renderCards(cards) {
-        const el = $('#okd-cards');
-        if (!el.length) return;
+        const main = $('#okd-cards-main');
+        const quality = $('#okd-cards-quality');
+        if (!main.length || !quality.length) return;
+        const conversion = (Number(cards.periodo || 0) > 0) ? ((Number(cards.agendados || 0) / Number(cards.periodo || 1)) * 100).toFixed(2) + '%' : '0%';
 
-        const items = [
+        const mainItems = [
             cardHtml('Total de leads', cards.total, 'Base completa de leads sincronizados'),
             cardHtml('Leads no período', cards.periodo, 'Resultado conforme filtros aplicados'),
-            cardHtml('Leads qualificados', cards.qualificados, 'Leads prontos para avanço comercial'),
             cardHtml('Leads desqualificados', cards.desqualificados, 'Leads encerrados sem potencial'),
             cardHtml('Reuniões agendadas', cards.agendados, 'Status com reunião marcada'),
-            cardHtml('Acima de R$ 20M/ano', cards.acima_20m, 'Leads HIGH VALUE'),
+            cardHtml('Taxa de conversão', conversion, 'Reuniões / Leads no período'),
+            cardHtml('Tempo médio até reunião', formatMinutes(cards.meeting_avg_minutes), 'Estimado por updated_at'),
+        ];
+        const qualityItems = [
             cardHtml('Desqualificados por faturamento', cards.desqualificados_faturamento, 'Não avançaram por baixa receita'),
             cardHtml('Base de recuperação', cards.base_recuperacao, 'Leads sem retorno/interação'),
             cardHtml('Não avançaram sem motivo', cards.sem_motivo_identificado, 'Sem razão identificada na Kommo'),
-            cardHtml('Total de não avançaram', cards.total_nao_avancaram, 'Status NÃO AVANÇOU'),
-            cardHtml('Tempo médio até reunião', formatMinutes(cards.meeting_avg_minutes), 'Estimado por updated_at'),
-            cardHtml('Tempo mediano até reunião', formatMinutes(cards.meeting_median_minutes), 'Estimado por updated_at'),
-            cardHtml('Leads sem reunião', cards.leads_sem_reuniao, 'Sem status agendado'),
-            cardHtml('Leads por origem', Object.keys(cards.por_origem || {}).length, summarizeMap(cards.por_origem)),
         ];
-
-        el.html(items.join(''));
+        main.html(mainItems.join(''));
+        quality.html(qualityItems.join(''));
     }
 
     function renderMetricsDebug(debugData) {
         const el = $('#okd-debug-metrics');
         if (!el.length) return;
+        if (!(typeof OptimizeKommoDashboard !== 'undefined' && OptimizeKommoDashboard.isAdmin)) {
+            el.hide();
+            return;
+        }
         const d = debugData || {};
         const rows = (d.sample_leads || []).map((r) => `<tr><td>${escapeHtml(r.lead_name)}</td><td>${escapeHtml(r.pipeline_name)}</td><td>${escapeHtml(r.status_name)}</td><td>${escapeHtml(r.faixa_faturamento)}</td><td>${escapeHtml(r.loss_reason_name)}</td><td>${escapeHtml(r.non_advance_category)}</td></tr>`).join('');
         el.html(`<h3>Debug de métricas</h3>
@@ -358,14 +361,11 @@
             renderMetricsDebug(resp.data.metricsDebug || {});
             renderTable(resp.data.table || [], pipelineFilter);
 
-            renderChart('okd-chart-day', 'Leads por dia', resp.data.charts.by_day || {}, pipelineFilter);
             renderChart('okd-chart-origem', 'Leads por origem', resp.data.charts.by_origem || {}, pipelineFilter);
-            renderChart('okd-chart-bu', 'Leads por BU', resp.data.charts.by_bu || {}, pipelineFilter);
-            renderChart('okd-chart-faixa', 'Leads por faturamento', resp.data.charts.by_faixa || {}, pipelineFilter);
-            renderChart('okd-chart-status', 'Leads por status', resp.data.charts.by_status || {}, pipelineFilter);
-            renderChart('okd-chart-pipeline', 'Leads por funil', resp.data.charts.by_pipeline || {}, pipelineFilter);
-            renderChart('okd-chart-non-advance', 'Motivos de não avanço', resp.data.charts.non_advance_reasons || {}, pipelineFilter);
+            renderChart('okd-chart-funnel-main', 'Funil SDR', resp.data.charts.by_status || {}, pipelineFilter);
             renderChart('okd-chart-loss-reasons', 'Motivos de perda / não avanço', resp.data.lossReasonsChart || resp.data.charts.loss_reasons || {}, pipelineFilter);
+            const meetingBuckets = resp.data.charts.meeting_time_buckets || {};
+            renderChart('okd-chart-meeting-time', 'Tempo até reunião (faixas)', meetingBuckets, pipelineFilter);
         });
     }
 
