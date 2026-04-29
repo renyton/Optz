@@ -237,7 +237,7 @@ class Optimize_Kommo_Dashboard
                 $desqualificados++;
             }
 
-            if (self::contains_keyword((string) ($row['status_name'] ?? ''), ['agendado'])) {
+            if (self::normalize_text((string) ($row['status_name'] ?? '')) === self::normalize_text('CLOSER - REUNIÃO AGENDADA')) {
                 $agendados++;
             }
 
@@ -406,7 +406,6 @@ class Optimize_Kommo_Dashboard
         $date_start = sanitize_text_field($request['date_start'] ?? '');
         $date_end   = sanitize_text_field($request['date_end'] ?? '');
         $map_filters = [
-            'pipeline_name'     => 'pipeline',
             'status_name'       => 'status',
             'bu'                => 'bu',
             'origem'            => 'origem',
@@ -415,6 +414,8 @@ class Optimize_Kommo_Dashboard
             'loss_reason_name'  => 'loss_reason_name',
             'non_advance_category' => 'non_advance_category',
         ];
+        $where[] = 'pipeline_name = %s';
+        $params[] = self::SDR_PIPELINE;
 
         if ('' !== $date_start) {
             $where[] = 'DATE(created_at) >= %s';
@@ -476,6 +477,10 @@ class Optimize_Kommo_Dashboard
 
         $options = [];
         foreach ($columns as $key => $column) {
+            if ('pipeline' === $key) {
+                $options[$key] = [self::SDR_PIPELINE];
+                continue;
+            }
             $values = $wpdb->get_col("SELECT DISTINCT {$column} FROM {$table} WHERE {$column} IS NOT NULL AND TRIM({$column}) <> ''");
             $values = array_values(array_filter(array_map('strval', $values)));
 

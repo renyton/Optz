@@ -29,6 +29,9 @@
 .okd-topbar {
     display: flex;
     justify-content: flex-end;
+    align-items: center;
+    grid-column: 1 / -1;
+    margin-top: 4px;
 }
 
 .okd-dashboard-header {
@@ -60,6 +63,8 @@
     padding: 8px 14px;
     border-radius: 10px;
     font-size: 13px;
+    position: static;
+    z-index: 1;
 }
 
 .okd-login-wrap {
