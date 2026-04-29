@@ -111,6 +111,19 @@
         </tbody>
     </table>
 
+    <h3><?php esc_html_e('Debug filtros (dataset da tabela)', 'optimize-kommo-dashboard'); ?></h3>
+    <table class="widefat striped">
+        <tbody>
+            <tr><th>total_leads_filtrados</th><td><?php echo esc_html((string) ($dashboard_filtered_debug['total_leads_filtrados'] ?? 0)); ?></td></tr>
+            <tr><th>total_nao_avancou</th><td><?php echo esc_html((string) ($dashboard_filtered_debug['total_nao_avancou'] ?? 0)); ?></td></tr>
+            <tr><th>total_com_loss_reason</th><td><?php echo esc_html((string) ($dashboard_filtered_debug['total_com_loss_reason'] ?? 0)); ?></td></tr>
+            <tr><th>total_com_non_advance_category</th><td><?php echo esc_html((string) ($dashboard_filtered_debug['total_com_non_advance_category'] ?? 0)); ?></td></tr>
+            <tr><th>total_desqualificados</th><td><?php echo esc_html((string) ($dashboard_filtered_debug['total_desqualificados'] ?? 0)); ?></td></tr>
+            <tr><th>total_base_recuperacao</th><td><?php echo esc_html((string) ($dashboard_filtered_debug['total_base_recuperacao'] ?? 0)); ?></td></tr>
+            <tr><th>Atualizado em</th><td><?php echo esc_html((string) ($dashboard_filtered_debug['updated_at'] ?? '')); ?></td></tr>
+        </tbody>
+    </table>
+
     <p>
         <button type="button" class="button button-primary" id="optimize-kommo-sync-now"><?php esc_html_e('Sincronizar agora', 'optimize-kommo-dashboard'); ?></button>
         <span id="optimize-kommo-sync-feedback"></span>

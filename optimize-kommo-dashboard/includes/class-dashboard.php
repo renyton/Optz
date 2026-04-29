@@ -212,53 +212,8 @@ class Optimize_Kommo_Dashboard
         global $wpdb;
         $table = Optimize_Kommo_DB::leads_table();
 
-        $where = ['1=1'];
-        $params = [];
-
         $request = wp_unslash($_POST);
-
-        $date_start = sanitize_text_field($request['date_start'] ?? '');
-        $date_end   = sanitize_text_field($request['date_end'] ?? '');
-
-        $map_filters = [
-            'pipeline_name'     => 'pipeline',
-            'status_name'       => 'status',
-            'bu'                => 'bu',
-            'origem'            => 'origem',
-            'responsible_user'  => 'responsible_user',
-            'faixa_faturamento' => 'faixa_faturamento',
-            'loss_reason_name'  => 'loss_reason_name',
-            'non_advance_category' => 'non_advance_category',
-        ];
-
-        if ('' !== $date_start) {
-            $where[] = 'DATE(created_at) >= %s';
-            $params[] = $date_start;
-        }
-
-        if ('' !== $date_end) {
-            $where[] = 'DATE(created_at) <= %s';
-            $params[] = $date_end;
-        }
-
-        foreach ($map_filters as $db_column => $request_key) {
-            $value = sanitize_text_field($request[$request_key] ?? '');
-            if ('' !== $value) {
-                $where[] = "{$db_column} = %s";
-                $params[] = $value;
-            }
-        }
-
-        $where_sql = implode(' AND ', $where);
-        $base_sql = "FROM {$table} WHERE {$where_sql}";
-
-        $rows = $wpdb->get_results(
-            self::prepare_query(
-                "SELECT lead_name, created_at, responsible_user, pipeline_name, status_name, bu, origem, faixa_faturamento, link_relatorio, loss_reason_name, non_advance_category, meeting_scheduled_at, time_to_meeting_minutes, time_to_meeting_source {$base_sql} ORDER BY created_at DESC",
-                $params
-            ),
-            ARRAY_A
-        );
+        $rows = self::get_filtered_leads($request);
 
         $total = count($rows);
         $qualificados = 0;
@@ -277,7 +232,7 @@ class Optimize_Kommo_Dashboard
                 $qualificados++;
             }
 
-            if (self::is_disqualified_lead($row)) {
+            if (self::is_desqualificado_por_faturamento_row($row, (string) ($row['non_advance_category'] ?? ''), (string) ($row['loss_reason_name'] ?? ''))) {
                 $desqualificados++;
             }
 
@@ -357,6 +312,15 @@ class Optimize_Kommo_Dashboard
 
         $table_rows = array_slice($rows, 0, 300);
         $filter_options = self::build_filter_options($request);
+        update_option('optimize_kommo_dashboard_last_debug', [
+            'total_leads_filtrados' => $total,
+            'total_nao_avancou' => $total_nao_avancaram,
+            'total_com_loss_reason' => count(array_filter($rows, static function ($r) { return '' !== trim((string) ($r['loss_reason_name'] ?? '')); })),
+            'total_com_non_advance_category' => count(array_filter($rows, static function ($r) { return '' !== trim((string) ($r['non_advance_category'] ?? '')); })),
+            'total_desqualificados' => $desqualificados_faturamento,
+            'total_base_recuperacao' => $base_recuperacao,
+            'updated_at' => current_time('mysql'),
+        ]);
 
         wp_send_json_success(
             [
@@ -407,6 +371,53 @@ class Optimize_Kommo_Dashboard
         }
 
         return $wpdb->prepare($sql, $params);
+    }
+
+    private static function get_filtered_leads(array $request)
+    {
+        global $wpdb;
+        $table = Optimize_Kommo_DB::leads_table();
+        $where = ['1=1'];
+        $params = [];
+
+        $date_start = sanitize_text_field($request['date_start'] ?? '');
+        $date_end   = sanitize_text_field($request['date_end'] ?? '');
+        $map_filters = [
+            'pipeline_name'     => 'pipeline',
+            'status_name'       => 'status',
+            'bu'                => 'bu',
+            'origem'            => 'origem',
+            'responsible_user'  => 'responsible_user',
+            'faixa_faturamento' => 'faixa_faturamento',
+            'loss_reason_name'  => 'loss_reason_name',
+            'non_advance_category' => 'non_advance_category',
+        ];
+
+        if ('' !== $date_start) {
+            $where[] = 'DATE(created_at) >= %s';
+            $params[] = $date_start;
+        }
+        if ('' !== $date_end) {
+            $where[] = 'DATE(created_at) <= %s';
+            $params[] = $date_end;
+        }
+        foreach ($map_filters as $db_column => $request_key) {
+            $value = sanitize_text_field($request[$request_key] ?? '');
+            if ('' !== $value) {
+                $where[] = "{$db_column} = %s";
+                $params[] = $value;
+            }
+        }
+
+        $where_sql = implode(' AND ', $where);
+        $base_sql = "FROM {$table} WHERE {$where_sql}";
+        return $wpdb->get_results(
+            self::prepare_query(
+                "SELECT lead_name, created_at, responsible_user, pipeline_name, status_name, bu, origem, faixa_faturamento, link_relatorio, loss_reason_name, non_advance_category, meeting_scheduled_at, time_to_meeting_minutes, time_to_meeting_source {$base_sql} ORDER BY created_at DESC",
+                $params
+            ),
+            ARRAY_A
+        );
     }
 
     private static function group_count(array $rows, callable $label_callback)

@@ -215,7 +215,7 @@
         const icon = CARD_ICONS[title] || '•';
         return `<article class="okd-card">
             <div class="okd-card-head"><span class="okd-card-icon">${icon}</span> ${escapeHtml(title)}</div>
-            <div class="okd-card-value">${escapeHtml(value || 0)}</div>
+            <div class="okd-card-value">${escapeHtml(value ?? 0)}</div>
             <div class="okd-card-sub">${escapeHtml(subtitle || '')}</div>
         </article>`;
     }

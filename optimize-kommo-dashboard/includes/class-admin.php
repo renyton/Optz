@@ -109,6 +109,7 @@ class Optimize_Kommo_Admin
             'base_recuperacao' => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$leads_table} WHERE non_advance_category = %s", 'Base de recuperação')),
             'sem_motivo_identificado' => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$leads_table} WHERE non_advance_category = %s", 'Não avançou - sem motivo identificado')),
         ];
+        $dashboard_filtered_debug = get_option('optimize_kommo_dashboard_last_debug', []);
         $dashboard_users = get_users(
             [
                 'role__in' => ['optimize_dashboard_viewer', 'administrator'],
