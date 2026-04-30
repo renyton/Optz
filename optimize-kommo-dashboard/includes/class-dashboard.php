@@ -237,7 +237,7 @@ class Optimize_Kommo_Dashboard
                 $desqualificados++;
             }
 
-            if (self::normalize_text((string) ($row['status_name'] ?? '')) === self::normalize_text('CLOSER - REUNIÃO AGENDADA')) {
+            if (self::is_meeting_scheduled_row($row)) {
                 $agendados++;
             }
 
@@ -373,6 +373,7 @@ class Optimize_Kommo_Dashboard
                     'roteamentos_bu_total' => $bu_routings_total,
                     'base_recuperacao' => $base_recuperacao,
                     'sem_motivo_identificado' => $sem_motivo_identificado,
+                    'pipeline_ativo' => sanitize_text_field((string) ($request['pipeline'] ?? '')),
                 ],
                 'charts' => $charts,
                 'table'  => $table_rows,
@@ -591,6 +592,16 @@ class Optimize_Kommo_Dashboard
     private static function is_lost_or_non_advanced_status($status_name)
     {
         return self::contains_keyword($status_name, ['não avançou', 'nao avancou', 'venda perdida', 'perdido', 'lost']);
+    }
+
+    private static function is_meeting_scheduled_row(array $row)
+    {
+        $status_name = (string) ($row['status_name'] ?? '');
+        if (self::contains_keyword($status_name, ['reunião agendada', 'reuniao agendada', 'agendado'])) {
+            return true;
+        }
+
+        return '' !== trim((string) ($row['meeting_scheduled_at'] ?? ''));
     }
 
     private static function classify_revenue_range($faixa)

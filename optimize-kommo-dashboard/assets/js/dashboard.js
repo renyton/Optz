@@ -253,7 +253,7 @@
             cardHtml('Não avançaram sem motivo', cards.sem_motivo_identificado, 'Sem causa identificada no CRM'),
         ];
         const qualityItems = [
-            cardHtml('Status do funil', 'SDR | Grupo Optimize', 'Filtro obrigatório'),
+            cardHtml('Status do funil', cards.pipeline_ativo || 'Nenhum funil selecionado', 'Filtro obrigatório'),
         ];
         if (main.length && quality.length) {
             main.html(mainItems.join(''));
