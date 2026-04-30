@@ -6,11 +6,31 @@ if (! defined('ABSPATH')) {
 
 class Optimize_Kommo_Dashboard
 {
+    private const SDR_PIPELINE = 'SDR | Grupo Optimize';
+    private const SDR_QUALIFIED_STATUSES = [
+        'QUALIFICADO MAS AINDA NÃO AGENDOU',
+        'CLOSER - REUNIÃO AGENDADA',
+    ];
+    private const SDR_STATUS_ORDER = [
+        'INCOMING LEADS',
+        'SDR - CONTATO INICIAL',
+        'SDR - AGENDADO COM O SDR',
+        'SDR - FUP SEM RESPOSTAS',
+        'SDR - QUALIFICAÇÃO INICIADA',
+        'SDR - NO SHOW SDR',
+        'QUALIFICADO MAS AINDA NÃO AGENDOU',
+        'CLOSER - REUNIÃO AGENDADA',
+        'NÃO AVANÇOU',
+    ];
+
     public static function init()
     {
         add_shortcode('optimize_kommo_dashboard', [__CLASS__, 'render_shortcode']);
+        add_shortcode('optimize_kommo_login', [__CLASS__, 'render_login_shortcode']);
         add_action('wp_enqueue_scripts', [__CLASS__, 'enqueue']);
         add_action('wp_ajax_optimize_kommo_get_dashboard_data', [__CLASS__, 'ajax_data']);
+        add_action('admin_init', [__CLASS__, 'block_viewer_admin_access']);
+        add_action('init', [__CLASS__, 'handle_login_submission']);
     }
 
     public static function enqueue()
@@ -35,20 +55,18 @@ class Optimize_Kommo_Dashboard
 
     public static function user_can_access()
     {
-        if (current_user_can('manage_options')) {
-            return true;
-        }
-
-        $allowed = (string) get_option('optimize_kommo_authorized_users', '');
-        $ids = array_filter(array_map('absint', array_map('trim', explode(',', $allowed))));
-
-        return in_array(get_current_user_id(), $ids, true);
+        return current_user_can('access_optimize_dashboard') || current_user_can('manage_options');
     }
 
     public static function render_shortcode()
     {
-        if (! is_user_logged_in() || ! self::user_can_access()) {
-            return '<p>' . esc_html__('Você não tem permissão para visualizar este dashboard.', 'optimize-kommo-dashboard') . '</p>';
+        if (! is_user_logged_in()) {
+            wp_safe_redirect(self::get_login_page_url());
+            exit;
+        }
+
+        if (! self::user_can_access()) {
+            return '<p>' . esc_html__('Acesso não autorizado.', 'optimize-kommo-dashboard') . '</p>';
         }
 
         wp_enqueue_style('optimize-kommo-dashboard-css');
@@ -60,6 +78,8 @@ class Optimize_Kommo_Dashboard
             [
                 'ajaxUrl' => admin_url('admin-ajax.php'),
                 'nonce'   => wp_create_nonce('optimize_kommo_dashboard_nonce'),
+                'logoutUrl' => wp_logout_url(self::get_login_page_url()),
+                'isAdmin' => current_user_can('manage_options'),
             ]
         );
 
@@ -67,6 +87,119 @@ class Optimize_Kommo_Dashboard
         include OPTIMIZE_KOMMO_DASHBOARD_PATH . 'templates/dashboard.php';
 
         return ob_get_clean();
+    }
+
+    public static function render_login_shortcode()
+    {
+        wp_enqueue_style('optimize-kommo-dashboard-css');
+
+        if (is_user_logged_in() && self::user_can_access()) {
+            wp_safe_redirect(self::get_dashboard_page_url());
+            exit;
+        }
+
+        $error_key = sanitize_text_field((string) ($_GET['okd_login_error'] ?? ''));
+        $error_map = [
+            'invalid_nonce' => __('Sessão inválida. Tente novamente.', 'optimize-kommo-dashboard'),
+            'empty_fields' => __('Informe usuário/e-mail e senha.', 'optimize-kommo-dashboard'),
+            'invalid_login' => __('Usuário ou senha inválidos.', 'optimize-kommo-dashboard'),
+            'not_allowed' => __('Seu usuário não possui acesso ao dashboard.', 'optimize-kommo-dashboard'),
+        ];
+        $message = $error_map[$error_key] ?? '';
+
+        ob_start();
+        ?>
+        <div class="okd-login-wrap">
+            <form method="post" class="okd-login-form">
+                <h2><?php esc_html_e('Login Dashboard Comercial', 'optimize-kommo-dashboard'); ?></h2>
+                <?php if ('' !== $message) : ?>
+                    <p class="okd-login-error"><?php echo esc_html($message); ?></p>
+                <?php endif; ?>
+                <input type="hidden" name="okd_login_action" value="1" />
+                <?php wp_nonce_field('okd_login_nonce_action', 'okd_login_nonce'); ?>
+                <p>
+                    <label for="okd_login_username"><?php esc_html_e('Usuário ou e-mail', 'optimize-kommo-dashboard'); ?></label>
+                    <input type="text" id="okd_login_username" name="okd_login_username" required />
+                </p>
+                <p>
+                    <label for="okd_login_password"><?php esc_html_e('Senha', 'optimize-kommo-dashboard'); ?></label>
+                    <input type="password" id="okd_login_password" name="okd_login_password" required />
+                </p>
+                <p><button type="submit" class="button button-primary"><?php esc_html_e('Entrar', 'optimize-kommo-dashboard'); ?></button></p>
+            </form>
+        </div>
+        <?php
+
+        return ob_get_clean();
+    }
+
+    public static function handle_login_submission()
+    {
+        if ('POST' !== strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET')) {
+            return;
+        }
+
+        if (empty($_POST['okd_login_action'])) {
+            return;
+        }
+
+        if (! isset($_POST['okd_login_nonce']) || ! wp_verify_nonce(sanitize_text_field((string) $_POST['okd_login_nonce']), 'okd_login_nonce_action')) {
+            wp_safe_redirect(add_query_arg('okd_login_error', 'invalid_nonce', self::get_login_page_url()));
+            exit;
+        }
+
+        $username = sanitize_text_field((string) ($_POST['okd_login_username'] ?? ''));
+        $password = (string) ($_POST['okd_login_password'] ?? '');
+        if ('' === $username || '' === $password) {
+            wp_safe_redirect(add_query_arg('okd_login_error', 'empty_fields', self::get_login_page_url()));
+            exit;
+        }
+
+        if (is_email($username)) {
+            $user = get_user_by('email', $username);
+            if ($user instanceof WP_User) {
+                $username = $user->user_login;
+            }
+        }
+
+        $signed = wp_signon(
+            [
+                'user_login' => $username,
+                'user_password' => $password,
+                'remember' => true,
+            ],
+            is_ssl()
+        );
+
+        if (is_wp_error($signed)) {
+            wp_safe_redirect(add_query_arg('okd_login_error', 'invalid_login', self::get_login_page_url()));
+            exit;
+        }
+
+        if (! user_can($signed, 'access_optimize_dashboard') && ! user_can($signed, 'manage_options')) {
+            wp_logout();
+            wp_safe_redirect(add_query_arg('okd_login_error', 'not_allowed', self::get_login_page_url()));
+            exit;
+        }
+
+        wp_safe_redirect(self::get_dashboard_page_url());
+        exit;
+    }
+
+    public static function block_viewer_admin_access()
+    {
+        if (! is_user_logged_in() || wp_doing_ajax()) {
+            return;
+        }
+
+        if (current_user_can('manage_options')) {
+            return;
+        }
+
+        if (current_user_can('access_optimize_dashboard')) {
+            wp_safe_redirect(self::get_dashboard_page_url());
+            exit;
+        }
     }
 
     public static function ajax_data()
@@ -80,57 +213,67 @@ class Optimize_Kommo_Dashboard
         global $wpdb;
         $table = Optimize_Kommo_DB::leads_table();
 
-        $where = ['1=1'];
-        $params = [];
-
         $request = wp_unslash($_POST);
+        $rows = self::get_filtered_leads($request);
 
-        $date_start = sanitize_text_field($request['date_start'] ?? '');
-        $date_end   = sanitize_text_field($request['date_end'] ?? '');
+        $total = count($rows);
+        $qualificados = 0;
+        $desqualificados = 0;
+        $agendados = 0;
+        $acima_20m = 0;
+        $desqualificados_faturamento = 0;
+        $base_recuperacao = 0;
+        $sem_motivo_identificado = 0;
+        $total_nao_avancaram = 0;
+        $meeting_minutes = [];
+        $leads_sem_reuniao = 0;
 
-        $map_filters = [
-            'pipeline_name'     => 'pipeline',
-            'status_name'       => 'status',
-            'bu'                => 'bu',
-            'origem'            => 'origem',
-            'responsible_user'  => 'responsible_user',
-            'faixa_faturamento' => 'faixa_faturamento',
-        ];
+        foreach ($rows as $row) {
+            if (self::is_qualified_lead($row)) {
+                $qualificados++;
+            }
 
-        if ('' !== $date_start) {
-            $where[] = 'DATE(created_at) >= %s';
-            $params[] = $date_start;
-        }
+            if (self::is_desqualificado_por_faturamento_row($row, (string) ($row['non_advance_category'] ?? ''), (string) ($row['loss_reason_name'] ?? ''))) {
+                $desqualificados++;
+            }
 
-        if ('' !== $date_end) {
-            $where[] = 'DATE(created_at) <= %s';
-            $params[] = $date_end;
-        }
+            if (self::is_meeting_scheduled_row($row)) {
+                $agendados++;
+            }
 
-        foreach ($map_filters as $db_column => $request_key) {
-            $value = sanitize_text_field($request[$request_key] ?? '');
-            if ('' !== $value) {
-                $where[] = "{$db_column} = %s";
-                $params[] = $value;
+            if (self::estimate_revenue_value((string) ($row['faixa_faturamento'] ?? '')) >= 20000000) {
+                $acima_20m++;
+            }
+
+            $category = (string) ($row['non_advance_category'] ?? '');
+            $loss_reason_name = (string) ($row['loss_reason_name'] ?? '');
+            if (self::is_lost_or_non_advanced_status((string) ($row['status_name'] ?? ''))) {
+                $total_nao_avancaram++;
+            }
+            if (self::is_desqualificado_por_faturamento_row($row, $category, $loss_reason_name)) {
+                $desqualificados_faturamento++;
+            } elseif (self::is_base_recuperacao_row($row, $category, $loss_reason_name)) {
+                $base_recuperacao++;
+            } elseif ('Não avançou - sem motivo identificado' === $category) {
+                $sem_motivo_identificado++;
+            }
+
+            $minutes = isset($row['time_to_meeting_minutes']) ? (int) $row['time_to_meeting_minutes'] : 0;
+            if ($minutes > 0) {
+                $meeting_minutes[] = $minutes;
+            } else {
+                $leads_sem_reuniao++;
             }
         }
-
-        $where_sql = implode(' AND ', $where);
-        $base_sql = "FROM {$table} WHERE {$where_sql}";
-
-        $total = (int) $wpdb->get_var(self::prepare_query("SELECT COUNT(*) {$base_sql}", $params));
-        $qualificados = (int) $wpdb->get_var(self::prepare_query("SELECT COUNT(*) {$base_sql} AND status_name NOT LIKE %s", array_merge($params, ['%Desqualificado%'])));
-        $desqualificados = (int) $wpdb->get_var(self::prepare_query("SELECT COUNT(*) {$base_sql} AND (status_name LIKE %s OR tags LIKE %s)", array_merge($params, ['%Desqualificado%', '%Desqualificado%'])));
-        $agendados = (int) $wpdb->get_var(self::prepare_query("SELECT COUNT(*) {$base_sql} AND (status_name LIKE %s OR tags LIKE %s)", array_merge($params, ['%Agendado%', '%Agendado%'])));
-        $acima_20m = (int) $wpdb->get_var(self::prepare_query("SELECT COUNT(*) {$base_sql} AND faixa_faturamento REGEXP %s", array_merge($params, ['(2[0-9]|[3-9][0-9]).*(mi|milh|MM)'])));
-
-        $rows = $wpdb->get_results(
-            self::prepare_query(
-                "SELECT lead_name, created_at, responsible_user, pipeline_name, status_name, bu, origem, faixa_faturamento, link_relatorio {$base_sql} ORDER BY created_at DESC LIMIT 300",
-                $params
-            ),
-            ARRAY_A
-        );
+        sort($meeting_minutes);
+        $meeting_avg = ! empty($meeting_minutes) ? round(array_sum($meeting_minutes) / count($meeting_minutes), 2) : 0;
+        $meeting_min = ! empty($meeting_minutes) ? min($meeting_minutes) : 0;
+        $meeting_max = ! empty($meeting_minutes) ? max($meeting_minutes) : 0;
+        $meeting_median = 0;
+        if (! empty($meeting_minutes)) {
+            $mid = (int) floor(count($meeting_minutes) / 2);
+            $meeting_median = (count($meeting_minutes) % 2) ? $meeting_minutes[$mid] : round(($meeting_minutes[$mid - 1] + $meeting_minutes[$mid]) / 2, 2);
+        }
 
         $charts = [
             'by_day' => self::group_count($rows, static function ($row) {
@@ -143,7 +286,7 @@ class Optimize_Kommo_Dashboard
                 return (string) ($row['bu'] ?: 'N/A');
             }),
             'by_faixa' => self::group_count($rows, static function ($row) {
-                return (string) ($row['faixa_faturamento'] ?: 'N/A');
+                return self::classify_revenue_range((string) ($row['faixa_faturamento'] ?? ''));
             }),
             'by_status' => self::group_count($rows, static function ($row) {
                 return (string) ($row['status_name'] ?: 'N/A');
@@ -151,7 +294,69 @@ class Optimize_Kommo_Dashboard
             'by_pipeline' => self::group_count($rows, static function ($row) {
                 return (string) ($row['pipeline_name'] ?: 'N/A');
             }),
+            'non_advance_reasons' => self::group_count($rows, static function ($row) {
+                $category = (string) ($row['non_advance_category'] ?? '');
+                if ('' === trim($category)) {
+                    return 'Outros';
+                }
+                return $category;
+            }),
+            'loss_reasons' => self::group_count($rows, static function ($row) {
+                $reason = trim((string) ($row['loss_reason_name'] ?? ''));
+                return '' === $reason ? 'Sem motivo informado' : $reason;
+            }),
+            'meeting_time_buckets' => self::group_count($rows, static function ($row) {
+                $m = isset($row['time_to_meeting_minutes']) ? (int) $row['time_to_meeting_minutes'] : 0;
+                if ($m <= 0) { return 'Sem reunião'; }
+                if ($m <= 60) { return 'Até 1 hora'; }
+                if ($m <= 240) { return '1 a 4 horas'; }
+                if ($m <= 1440) { return '4 a 24 horas'; }
+                if ($m <= 4320) { return '1 a 3 dias'; }
+                if ($m <= 10080) { return '3 a 7 dias'; }
+                return 'Acima de 7 dias';
+            }),
         ];
+        $charts['by_bu'] = ['Consulting' => 0, 'Accounting' => 0, 'Jurídico' => 0, 'Marketing' => 0, 'Tech' => 0];
+        foreach ($rows as $row) {
+            $r = self::extract_bu_routings_from_tags((string) ($row['tags'] ?? ''));
+            foreach ($charts['by_bu'] as $k => $v) {
+                $charts['by_bu'][$k] += (int) ($r[$k] ?? 0);
+            }
+        }
+
+        if (self::normalize_text($request['pipeline'] ?? '') === self::normalize_text(self::SDR_PIPELINE)) {
+            $charts['by_status'] = self::order_status_map_for_sdr($charts['by_status']);
+        }
+
+        $table_rows = array_slice($rows, 0, 300);
+        $filter_options = self::build_filter_options($request);
+        $revenue_kpis = ['1M a 20M' => 0, '20M a 50M' => 0, '50M a 100M' => 0, 'Faturamento não classificado' => 0];
+        $bu_routings_total = 0;
+        foreach ($rows as $row) {
+            $bucket = self::classify_revenue_range((string) ($row['faixa_faturamento'] ?? ''));
+            $revenue_kpis[$bucket] = ($revenue_kpis[$bucket] ?? 0) + 1;
+            $bu_routings_total += array_sum(self::extract_bu_routings_from_tags((string) ($row['tags'] ?? '')));
+        }
+        update_option('optimize_kommo_dashboard_last_debug', [
+            'total_leads_filtrados' => $total,
+            'total_nao_avancou' => $total_nao_avancaram,
+            'total_venda_perdida' => count(array_filter($rows, static function ($r) { return false !== stripos((string) ($r['status_name'] ?? ''), 'venda perdida'); })),
+            'total_com_loss_reason' => count(array_filter($rows, static function ($r) { return '' !== trim((string) ($r['loss_reason_name'] ?? '')); })),
+            'total_com_non_advance_category' => count(array_filter($rows, static function ($r) { return '' !== trim((string) ($r['non_advance_category'] ?? '')); })),
+            'total_desqualificados' => $desqualificados_faturamento,
+            'total_base_recuperacao' => $base_recuperacao,
+            'updated_at' => current_time('mysql'),
+            'sample_leads' => array_slice(array_map(static function ($r) {
+                return [
+                    'lead_name' => (string) ($r['lead_name'] ?? ''),
+                    'pipeline_name' => (string) ($r['pipeline_name'] ?? ''),
+                    'status_name' => (string) ($r['status_name'] ?? ''),
+                    'faixa_faturamento' => (string) ($r['faixa_faturamento'] ?? ''),
+                    'loss_reason_name' => (string) ($r['loss_reason_name'] ?? ''),
+                    'non_advance_category' => (string) ($r['non_advance_category'] ?? ''),
+                ];
+            }, $rows), 0, 20),
+        ]);
 
         wp_send_json_success(
             [
@@ -159,14 +364,33 @@ class Optimize_Kommo_Dashboard
                     'total'          => $total,
                     'periodo'        => $total,
                     'qualificados'   => $qualificados,
+                    'faixa_1_20'     => $revenue_kpis['1M a 20M'] ?? 0,
+                    'faixa_20_50'    => $revenue_kpis['20M a 50M'] ?? 0,
+                    'faixa_50_100'   => $revenue_kpis['50M a 100M'] ?? 0,
+                    'acima_20m'      => $acima_20m,
                     'desqualificados'=> $desqualificados,
                     'agendados'      => $agendados,
-                    'acima_20m'      => $acima_20m,
-                    'por_bu'         => $charts['by_bu'],
-                    'por_origem'     => $charts['by_origem'],
+                    'roteamentos_bu_total' => $bu_routings_total,
+                    'base_recuperacao' => $base_recuperacao,
+                    'sem_motivo_identificado' => $sem_motivo_identificado,
+                    'pipeline_ativo' => sanitize_text_field((string) ($request['pipeline'] ?? '')),
                 ],
                 'charts' => $charts,
-                'table'  => $rows,
+                'table'  => $table_rows,
+                'filter_options' => $filter_options,
+                'lossReasonsChart' => $charts['loss_reasons'],
+                'nonAdvanceCategoryChart' => $charts['non_advance_reasons'],
+                'nonAdvanceKpis' => [
+                    'totalNaoAvancaram' => $total_nao_avancaram,
+                    'desqualificadosPorFaturamento' => $desqualificados_faturamento,
+                    'baseRecuperacao' => $base_recuperacao,
+                    'semMotivoIdentificado' => $sem_motivo_identificado,
+                ],
+                'filterOptions' => [
+                    'lossReasons' => (array) ($filter_options['loss_reason_name'] ?? []),
+                    'nonAdvanceCategories' => (array) ($filter_options['non_advance_category'] ?? []),
+                ],
+                'metricsDebug' => get_option('optimize_kommo_dashboard_last_debug', []),
             ]
         );
     }
@@ -182,6 +406,53 @@ class Optimize_Kommo_Dashboard
         return $wpdb->prepare($sql, $params);
     }
 
+    public static function get_filtered_leads(array $request)
+    {
+        global $wpdb;
+        $table = Optimize_Kommo_DB::leads_table();
+        $where = ['1=1'];
+        $params = [];
+
+        $date_start = sanitize_text_field($request['date_start'] ?? '');
+        $date_end   = sanitize_text_field($request['date_end'] ?? '');
+        $map_filters = [
+            'pipeline_name'     => 'pipeline',
+            'status_name'       => 'status',
+            'bu'                => 'bu',
+            'origem'            => 'origem',
+            'responsible_user'  => 'responsible_user',
+            'faixa_faturamento' => 'faixa_faturamento',
+            'loss_reason_name'  => 'loss_reason_name',
+            'non_advance_category' => 'non_advance_category',
+        ];
+
+        if ('' !== $date_start) {
+            $where[] = 'DATE(created_at) >= %s';
+            $params[] = $date_start;
+        }
+        if ('' !== $date_end) {
+            $where[] = 'DATE(created_at) <= %s';
+            $params[] = $date_end;
+        }
+        foreach ($map_filters as $db_column => $request_key) {
+            $value = sanitize_text_field($request[$request_key] ?? '');
+            if ('' !== $value) {
+                $where[] = "{$db_column} = %s";
+                $params[] = $value;
+            }
+        }
+
+        $where_sql = implode(' AND ', $where);
+        $base_sql = "FROM {$table} WHERE {$where_sql}";
+        return $wpdb->get_results(
+            self::prepare_query(
+                "SELECT lead_name, created_at, responsible_user, pipeline_name, status_name, tags, bu, origem, faixa_faturamento, link_relatorio, loss_reason_name, non_advance_category, meeting_scheduled_at, time_to_meeting_minutes, time_to_meeting_source {$base_sql} ORDER BY created_at DESC",
+                $params
+            ),
+            ARRAY_A
+        );
+    }
+
     private static function group_count(array $rows, callable $label_callback)
     {
         $counts = [];
@@ -195,5 +466,269 @@ class Optimize_Kommo_Dashboard
         }
 
         return $counts;
+    }
+
+    private static function build_filter_options(array $request)
+    {
+        global $wpdb;
+        $table = Optimize_Kommo_DB::leads_table();
+
+        $selected_pipeline = sanitize_text_field((string) ($request['pipeline'] ?? ''));
+        $columns = [
+            'pipeline' => 'pipeline_name',
+            'status' => 'status_name',
+            'bu' => 'bu',
+            'origem' => 'origem',
+            'responsible_user' => 'responsible_user',
+            'faixa_faturamento' => 'faixa_faturamento',
+            'loss_reason_name' => 'loss_reason_name',
+            'non_advance_category' => 'non_advance_category',
+        ];
+
+        $options = [];
+        foreach ($columns as $key => $column) {
+            if ('pipeline' === $key) {
+                $options[$key] = self::get_available_pipelines();
+                continue;
+            }
+            if ('' === $selected_pipeline) {
+                $options[$key] = [];
+                continue;
+            }
+            $values = $wpdb->get_col($wpdb->prepare("SELECT DISTINCT {$column} FROM {$table} WHERE pipeline_name = %s AND {$column} IS NOT NULL AND TRIM({$column}) <> ''", $selected_pipeline));
+            $values = array_values(array_filter(array_map('strval', $values)));
+
+            if ('status' === $key && self::normalize_text($request['pipeline'] ?? '') === self::normalize_text(self::SDR_PIPELINE)) {
+                $values = self::order_status_values_for_sdr($values);
+            } else {
+                natcasesort($values);
+                $values = array_values($values);
+            }
+
+            $options[$key] = $values;
+        }
+
+        return $options;
+    }
+
+    private static function get_available_pipelines()
+    {
+        global $wpdb;
+        $table = Optimize_Kommo_DB::leads_table();
+        $values = $wpdb->get_col("SELECT DISTINCT pipeline_name FROM {$table} WHERE pipeline_name IS NOT NULL AND TRIM(pipeline_name) <> ''");
+        natcasesort($values);
+        return array_values(array_map('strval', $values));
+    }
+
+    private static function normalize_text($value)
+    {
+        $text = strtolower(trim(preg_replace('/\s+/u', ' ', (string) $value)));
+
+        return remove_accents($text);
+    }
+
+    private static function contains_keyword($value, array $keywords)
+    {
+        $normalized = self::normalize_text($value);
+        foreach ($keywords as $keyword) {
+            if (false !== strpos($normalized, self::normalize_text($keyword))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function is_qualified_lead(array $row)
+    {
+        $pipeline = self::normalize_text($row['pipeline_name'] ?? '');
+        $status = self::normalize_text($row['status_name'] ?? '');
+
+        if ($pipeline === self::normalize_text(self::SDR_PIPELINE)) {
+            foreach (self::SDR_QUALIFIED_STATUSES as $allowed) {
+                if ($status === self::normalize_text($allowed)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return ! self::contains_keyword((string) ($row['status_name'] ?? ''), ['desqualificado', 'nao avancou', 'não avançou', 'baixa']);
+    }
+
+    private static function is_disqualified_lead(array $row)
+    {
+        $status = (string) ($row['status_name'] ?? '');
+        $is_low_status = self::contains_keyword($status, ['baixa', 'desqualificado', 'nao avancou', 'não avançou']);
+        if (! $is_low_status) {
+            return false;
+        }
+
+        $revenue = self::estimate_revenue_value((string) ($row['faixa_faturamento'] ?? ''));
+
+        return $revenue > 0 && $revenue < 1000000;
+    }
+
+    private static function is_desqualificado_por_faturamento_row(array $row, $category, $loss_reason_name)
+    {
+        if (! self::is_disqualified($row)) {
+            return false;
+        }
+        return true;
+    }
+
+    private static function is_base_recuperacao_row(array $row, $category, $loss_reason_name)
+    {
+        if (! self::is_lost_or_non_advanced_status((string) ($row['status_name'] ?? ''))) {
+            return false;
+        }
+        if ('Base de recuperação' === $category) {
+            return true;
+        }
+        return self::contains_keyword($loss_reason_name, ['sem resposta', 'sem retorno', 'não respondeu', 'nao respondeu', 'não interagiu', 'nao interagiu', 'fup sem resposta', 'follow up sem resposta', 'base de recuperação', 'base de recuperacao']);
+    }
+
+    private static function is_lost_or_non_advanced_status($status_name)
+    {
+        return self::contains_keyword($status_name, ['não avançou', 'nao avancou', 'venda perdida', 'perdido', 'lost']);
+    }
+
+    private static function is_meeting_scheduled_row(array $row)
+    {
+        $status_name = (string) ($row['status_name'] ?? '');
+        if (self::contains_keyword($status_name, ['reunião agendada', 'reuniao agendada', 'agendado'])) {
+            return true;
+        }
+
+        return '' !== trim((string) ($row['meeting_scheduled_at'] ?? ''));
+    }
+
+    private static function classify_revenue_range($faixa)
+    {
+        $v = self::normalize_text($faixa);
+        if (self::contains_keyword($v, ['1m - 5m', '5m - 10m', '10m - 20m', '1m a 20m', '1 a 20 milhoes'])) { return '1M a 20M'; }
+        if (self::contains_keyword($v, ['20m - 50m', '20m a 50m', '20 a 50 milhoes'])) { return '20M a 50M'; }
+        if (self::contains_keyword($v, ['50m - 100m', '50m a 100m', '50 a 100 milhoes'])) { return '50M a 100M'; }
+        return 'Faturamento não classificado';
+    }
+
+    private static function is_disqualified(array $lead)
+    {
+        if (! self::is_lost_or_non_advanced_status((string) ($lead['status_name'] ?? ''))) {
+            return false;
+        }
+        $tags = self::normalize_text((string) ($lead['tags'] ?? ''));
+        return self::contains_keyword($tags, ['desqualificado', 'desqualificados']);
+    }
+
+    private static function extract_bu_routings_from_tags($tags_json)
+    {
+        $counts = ['Consulting' => 0, 'Accounting' => 0, 'Jurídico' => 0, 'Marketing' => 0, 'Tech' => 0];
+        $tags = json_decode((string) $tags_json, true);
+        if (! is_array($tags)) {
+            return $counts;
+        }
+        $flat = self::normalize_text(implode('|', array_map('strval', $tags)));
+        if (false !== strpos($flat, 'consulting')) { $counts['Consulting']++; }
+        if (false !== strpos($flat, 'account') || false !== strpos($flat, 'contabilidade')) { $counts['Accounting']++; }
+        if (false !== strpos($flat, 'juridico')) { $counts['Jurídico']++; }
+        if (false !== strpos($flat, 'marketing')) { $counts['Marketing']++; }
+        if (false !== strpos($flat, 'tech')) { $counts['Tech']++; }
+        return $counts;
+    }
+
+    private static function estimate_revenue_value($raw_value)
+    {
+        $value = self::normalize_text($raw_value);
+        if ('' === $value) {
+            return 0;
+        }
+
+        if (preg_match('/(\d+(?:[.,]\d+)?)\s*(mi|milhao|milhoes|milhaoes|mm)\b/u', $value, $matches)) {
+            return (float) str_replace(',', '.', $matches[1]) * 1000000;
+        }
+
+        if (preg_match('/(\d+(?:[.,]\d+)?)\s*mil\b/u', $value, $matches)) {
+            return (float) str_replace(',', '.', $matches[1]) * 1000;
+        }
+
+        if (preg_match('/\d[\d\.\,]*/u', $value, $matches)) {
+            $numeric = preg_replace('/[^\d]/', '', $matches[0]);
+            return (float) $numeric;
+        }
+
+        return 0;
+    }
+
+    private static function order_status_values_for_sdr(array $values)
+    {
+        $normalized_map = [];
+        foreach ($values as $value) {
+            $normalized_map[self::normalize_text($value)] = $value;
+        }
+
+        $ordered = [];
+        foreach (self::SDR_STATUS_ORDER as $status) {
+            $key = self::normalize_text($status);
+            if (isset($normalized_map[$key])) {
+                $ordered[] = $normalized_map[$key];
+                unset($normalized_map[$key]);
+            }
+        }
+
+        if (! empty($normalized_map)) {
+            $remaining = array_values($normalized_map);
+            natcasesort($remaining);
+            $ordered = array_merge($ordered, array_values($remaining));
+        }
+
+        return $ordered;
+    }
+
+    private static function order_status_map_for_sdr(array $map)
+    {
+        $ordered_keys = self::order_status_values_for_sdr(array_keys($map));
+        $ordered_map = [];
+
+        foreach ($ordered_keys as $key) {
+            if (isset($map[$key])) {
+                $ordered_map[$key] = $map[$key];
+            }
+        }
+
+        return $ordered_map;
+    }
+
+    public static function get_login_page_url()
+    {
+        $page_id = self::find_page_with_shortcode('optimize_kommo_login');
+        if ($page_id > 0) {
+            return get_permalink($page_id);
+        }
+
+        return wp_login_url();
+    }
+
+    public static function get_dashboard_page_url()
+    {
+        $page_id = self::find_page_with_shortcode('optimize_kommo_dashboard');
+        if ($page_id > 0) {
+            return get_permalink($page_id);
+        }
+
+        return home_url('/');
+    }
+
+    private static function find_page_with_shortcode($shortcode)
+    {
+        $pages = get_pages(['post_status' => ['publish', 'private']]);
+        foreach ($pages as $page) {
+            if (isset($page->post_content) && false !== strpos((string) $page->post_content, '[' . $shortcode . ']')) {
+                return (int) $page->ID;
+            }
+        }
+
+        return 0;
     }
 }
