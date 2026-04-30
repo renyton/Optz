@@ -286,7 +286,7 @@ class Optimize_Kommo_Dashboard
                 return (string) ($row['bu'] ?: 'N/A');
             }),
             'by_faixa' => self::group_count($rows, static function ($row) {
-                return (string) ($row['faixa_faturamento'] ?: 'N/A');
+                return self::classify_revenue_range((string) ($row['faixa_faturamento'] ?? ''));
             }),
             'by_status' => self::group_count($rows, static function ($row) {
                 return (string) ($row['status_name'] ?: 'N/A');
@@ -316,6 +316,13 @@ class Optimize_Kommo_Dashboard
                 return 'Acima de 7 dias';
             }),
         ];
+        $charts['by_bu'] = ['Consulting' => 0, 'Accounting' => 0, 'Jurídico' => 0, 'Marketing' => 0, 'Tech' => 0];
+        foreach ($rows as $row) {
+            $r = self::extract_bu_routings_from_tags((string) ($row['tags'] ?? ''));
+            foreach ($charts['by_bu'] as $k => $v) {
+                $charts['by_bu'][$k] += (int) ($r[$k] ?? 0);
+            }
+        }
 
         if (self::normalize_text($request['pipeline'] ?? '') === self::normalize_text(self::SDR_PIPELINE)) {
             $charts['by_status'] = self::order_status_map_for_sdr($charts['by_status']);
@@ -323,6 +330,13 @@ class Optimize_Kommo_Dashboard
 
         $table_rows = array_slice($rows, 0, 300);
         $filter_options = self::build_filter_options($request);
+        $revenue_kpis = ['1M a 20M' => 0, '20M a 50M' => 0, '50M a 100M' => 0, 'Faturamento não classificado' => 0];
+        $bu_routings_total = 0;
+        foreach ($rows as $row) {
+            $bucket = self::classify_revenue_range((string) ($row['faixa_faturamento'] ?? ''));
+            $revenue_kpis[$bucket] = ($revenue_kpis[$bucket] ?? 0) + 1;
+            $bu_routings_total += array_sum(self::extract_bu_routings_from_tags((string) ($row['tags'] ?? '')));
+        }
         update_option('optimize_kommo_dashboard_last_debug', [
             'total_leads_filtrados' => $total,
             'total_nao_avancou' => $total_nao_avancaram,
@@ -349,21 +363,12 @@ class Optimize_Kommo_Dashboard
                 'cards' => [
                     'total'          => $total,
                     'periodo'        => $total,
-                    'qualificados'   => $qualificados,
+                    'faixa_1_20'     => $revenue_kpis['1M a 20M'] ?? 0,
+                    'faixa_20_50'    => $revenue_kpis['20M a 50M'] ?? 0,
+                    'faixa_50_100'   => $revenue_kpis['50M a 100M'] ?? 0,
                     'desqualificados'=> $desqualificados,
-                    'leads_desqualificados'=> $desqualificados,
                     'agendados'      => $agendados,
-                    'acima_20m'      => $acima_20m,
-                    'desqualificados_faturamento' => $desqualificados_faturamento,
-                    'base_recuperacao' => $base_recuperacao,
-                    'sem_motivo_identificado' => $sem_motivo_identificado,
-                    'total_nao_avancaram' => $total_nao_avancaram,
-                    'por_origem'     => $charts['by_origem'],
-                    'meeting_avg_minutes' => $meeting_avg,
-                    'meeting_median_minutes' => $meeting_median,
-                    'meeting_min_minutes' => $meeting_min,
-                    'meeting_max_minutes' => $meeting_max,
-                    'leads_sem_reuniao' => $leads_sem_reuniao,
+                    'roteamentos_bu_total' => $bu_routings_total,
                 ],
                 'charts' => $charts,
                 'table'  => $table_rows,
@@ -396,7 +401,7 @@ class Optimize_Kommo_Dashboard
         return $wpdb->prepare($sql, $params);
     }
 
-    private static function get_filtered_leads(array $request)
+    public static function get_filtered_leads(array $request)
     {
         global $wpdb;
         $table = Optimize_Kommo_DB::leads_table();
@@ -406,6 +411,7 @@ class Optimize_Kommo_Dashboard
         $date_start = sanitize_text_field($request['date_start'] ?? '');
         $date_end   = sanitize_text_field($request['date_end'] ?? '');
         $map_filters = [
+            'pipeline_name'     => 'pipeline',
             'status_name'       => 'status',
             'bu'                => 'bu',
             'origem'            => 'origem',
@@ -414,8 +420,6 @@ class Optimize_Kommo_Dashboard
             'loss_reason_name'  => 'loss_reason_name',
             'non_advance_category' => 'non_advance_category',
         ];
-        $where[] = 'pipeline_name = %s';
-        $params[] = self::SDR_PIPELINE;
 
         if ('' !== $date_start) {
             $where[] = 'DATE(created_at) >= %s';
@@ -438,6 +442,7 @@ class Optimize_Kommo_Dashboard
         return $wpdb->get_results(
             self::prepare_query(
                 "SELECT lead_name, created_at, responsible_user, pipeline_name, status_name, bu, origem, faixa_faturamento, link_relatorio, loss_reason_name, non_advance_category, meeting_scheduled_at, time_to_meeting_minutes, time_to_meeting_source {$base_sql} ORDER BY created_at DESC",
+                "SELECT lead_name, created_at, responsible_user, pipeline_name, status_name, tags, bu, origem, faixa_faturamento, link_relatorio, loss_reason_name, non_advance_category, meeting_scheduled_at, time_to_meeting_minutes, time_to_meeting_source {$base_sql} ORDER BY created_at DESC",
                 $params
             ),
             ARRAY_A
@@ -464,6 +469,7 @@ class Optimize_Kommo_Dashboard
         global $wpdb;
         $table = Optimize_Kommo_DB::leads_table();
 
+        $selected_pipeline = sanitize_text_field((string) ($request['pipeline'] ?? ''));
         $columns = [
             'pipeline' => 'pipeline_name',
             'status' => 'status_name',
@@ -478,10 +484,14 @@ class Optimize_Kommo_Dashboard
         $options = [];
         foreach ($columns as $key => $column) {
             if ('pipeline' === $key) {
-                $options[$key] = [self::SDR_PIPELINE];
+                $options[$key] = self::get_available_pipelines();
                 continue;
             }
-            $values = $wpdb->get_col("SELECT DISTINCT {$column} FROM {$table} WHERE {$column} IS NOT NULL AND TRIM({$column}) <> ''");
+            if ('' === $selected_pipeline) {
+                $options[$key] = [];
+                continue;
+            }
+            $values = $wpdb->get_col($wpdb->prepare("SELECT DISTINCT {$column} FROM {$table} WHERE pipeline_name = %s AND {$column} IS NOT NULL AND TRIM({$column}) <> ''", $selected_pipeline));
             $values = array_values(array_filter(array_map('strval', $values)));
 
             if ('status' === $key && self::normalize_text($request['pipeline'] ?? '') === self::normalize_text(self::SDR_PIPELINE)) {
@@ -495,6 +505,15 @@ class Optimize_Kommo_Dashboard
         }
 
         return $options;
+    }
+
+    private static function get_available_pipelines()
+    {
+        global $wpdb;
+        $table = Optimize_Kommo_DB::leads_table();
+        $values = $wpdb->get_col("SELECT DISTINCT pipeline_name FROM {$table} WHERE pipeline_name IS NOT NULL AND TRIM(pipeline_name) <> ''");
+        natcasesort($values);
+        return array_values(array_map('strval', $values));
     }
 
     private static function normalize_text($value)
@@ -549,16 +568,10 @@ class Optimize_Kommo_Dashboard
 
     private static function is_desqualificado_por_faturamento_row(array $row, $category, $loss_reason_name)
     {
-        if (! self::is_lost_or_non_advanced_status((string) ($row['status_name'] ?? ''))) {
+        if (! self::is_disqualified($row)) {
             return false;
         }
-        if ('Desqualificado por faturamento' === $category) {
-            return true;
-        }
-        if (self::estimate_revenue_value((string) ($row['faixa_faturamento'] ?? '')) > 0 && self::estimate_revenue_value((string) ($row['faixa_faturamento'] ?? '')) < 1000000) {
-            return true;
-        }
-        return self::contains_keyword($loss_reason_name, ['fora do target', 'abaixo', 'menor', 'faturamento', 'receita']);
+        return true;
     }
 
     private static function is_base_recuperacao_row(array $row, $category, $loss_reason_name)
@@ -575,6 +588,40 @@ class Optimize_Kommo_Dashboard
     private static function is_lost_or_non_advanced_status($status_name)
     {
         return self::contains_keyword($status_name, ['não avançou', 'nao avancou', 'venda perdida', 'perdido', 'lost']);
+    }
+
+    private static function classify_revenue_range($faixa)
+    {
+        $v = self::normalize_text($faixa);
+        if (self::contains_keyword($v, ['1m - 5m', '5m - 10m', '10m - 20m', '1m a 20m', '1 a 20 milhoes'])) { return '1M a 20M'; }
+        if (self::contains_keyword($v, ['20m - 50m', '20m a 50m', '20 a 50 milhoes'])) { return '20M a 50M'; }
+        if (self::contains_keyword($v, ['50m - 100m', '50m a 100m', '50 a 100 milhoes'])) { return '50M a 100M'; }
+        return 'Faturamento não classificado';
+    }
+
+    private static function is_disqualified(array $lead)
+    {
+        if (! self::is_lost_or_non_advanced_status((string) ($lead['status_name'] ?? ''))) {
+            return false;
+        }
+        $tags = self::normalize_text((string) ($lead['tags'] ?? ''));
+        return self::contains_keyword($tags, ['desqualificado', 'desqualificados']);
+    }
+
+    private static function extract_bu_routings_from_tags($tags_json)
+    {
+        $counts = ['Consulting' => 0, 'Accounting' => 0, 'Jurídico' => 0, 'Marketing' => 0, 'Tech' => 0];
+        $tags = json_decode((string) $tags_json, true);
+        if (! is_array($tags)) {
+            return $counts;
+        }
+        $flat = self::normalize_text(implode('|', array_map('strval', $tags)));
+        if (false !== strpos($flat, 'consulting')) { $counts['Consulting']++; }
+        if (false !== strpos($flat, 'account') || false !== strpos($flat, 'contabilidade')) { $counts['Accounting']++; }
+        if (false !== strpos($flat, 'juridico')) { $counts['Jurídico']++; }
+        if (false !== strpos($flat, 'marketing')) { $counts['Marketing']++; }
+        if (false !== strpos($flat, 'tech')) { $counts['Tech']++; }
+        return $counts;
     }
 
     private static function estimate_revenue_value($raw_value)

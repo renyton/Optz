@@ -238,17 +238,17 @@
         const conversion = (Number(cards.periodo || 0) > 0) ? ((Number(cards.agendados || 0) / Number(cards.periodo || 1)) * 100).toFixed(2) + '%' : '0%';
 
         const mainItems = [
-            cardHtml('Total de leads', cards.total, 'Base completa de leads sincronizados'),
             cardHtml('Leads no período', cards.periodo, 'Resultado conforme filtros aplicados'),
-            cardHtml('Leads desqualificados', cards.desqualificados, 'Leads encerrados sem potencial'),
+            cardHtml('Faturamento 1M-20M', cards.faixa_1_20, 'Leads no intervalo'),
+            cardHtml('Faturamento 20M-50M', cards.faixa_20_50, 'Leads no intervalo'),
+            cardHtml('Faturamento 50M-100M', cards.faixa_50_100, 'Leads no intervalo'),
+            cardHtml('Leads desqualificados', cards.desqualificados, 'Final de funil + tag desqualificado'),
             cardHtml('Reuniões agendadas', cards.agendados, 'Status com reunião marcada'),
             cardHtml('Taxa de conversão', conversion, 'Reuniões / Leads no período'),
-            cardHtml('Tempo médio até reunião', formatMinutes(cards.meeting_avg_minutes), 'Estimado por updated_at'),
+            cardHtml('Roteamentos por BU', cards.roteamentos_bu_total, 'Soma de direcionamentos por tags'),
         ];
         const qualityItems = [
-            cardHtml('Desqualificados por faturamento', cards.desqualificados_faturamento, 'Não avançaram por baixa receita'),
-            cardHtml('Base de recuperação', cards.base_recuperacao, 'Leads sem retorno/interação'),
-            cardHtml('Não avançaram sem motivo', cards.sem_motivo_identificado, 'Sem razão identificada na Kommo'),
+            cardHtml('Status do funil', 'SDR | Grupo Optimize', 'Filtro obrigatório'),
         ];
         if (main.length && quality.length) {
             main.html(mainItems.join(''));
@@ -334,7 +334,8 @@
         if (!$select.length) return;
 
         const current = selectedValue != null ? String(selectedValue) : String($select.val() || '');
-        const options = ['<option value="">Todos</option>'];
+        const defaultLabel = selector === '#okd-status' ? 'Todos os status' : 'Todos';
+        const options = [selector === '#okd-pipeline' ? '<option value="">Selecione um funil</option>' : `<option value="">${defaultLabel}</option>`];
         (values || []).forEach((value) => {
             const raw = String(value);
             const selected = raw === current ? ' selected' : '';
@@ -353,11 +354,19 @@
         renderFilterSelect('#okd-faixa', filterOptions.faixa_faturamento, selectedFilters.faixa_faturamento);
         renderFilterSelect('#okd-loss-reason', filterOptions.loss_reason_name, selectedFilters.loss_reason_name);
         renderFilterSelect('#okd-non-advance-category', filterOptions.non_advance_category, selectedFilters.non_advance_category);
+        const hasPipeline = !!selectedFilters.pipeline;
+        ['#okd-status', '#okd-bu', '#okd-origem', '#okd-responsible', '#okd-faixa', '#okd-loss-reason', '#okd-non-advance-category'].forEach((id) => {
+            $(id).prop('disabled', !hasPipeline);
+        });
     }
 
     function loadDashboard() {
         if (typeof OptimizeKommoDashboard === 'undefined') return;
         const payload = dashboardPayload();
+        if (!payload.pipeline) {
+            renderCards({});
+            return;
+        }
         const pipelineFilter = payload.pipeline;
 
         $.post(OptimizeKommoDashboard.ajaxUrl, payload, function (resp) {
@@ -426,5 +435,6 @@
         });
 
         loadDashboard();
+        renderFilterOptions({ pipeline: [] }, { pipeline: '' });
     });
 })(jQuery);

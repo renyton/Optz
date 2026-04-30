@@ -24,7 +24,7 @@
         </div>
         <div class="okd-filter">
             <label for="okd-pipeline">Funil</label>
-            <select id="okd-pipeline"><option value="SDR | Grupo Optimize">SDR | Grupo Optimize</option></select>
+            <select id="okd-pipeline"><option value="">Selecione um funil</option></select>
         </div>
         <div class="okd-filter">
             <label for="okd-status">Status</label>
