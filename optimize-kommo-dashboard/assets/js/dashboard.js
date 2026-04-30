@@ -363,15 +363,17 @@
     function loadDashboard() {
         if (typeof OptimizeKommoDashboard === 'undefined') return;
         const payload = dashboardPayload();
-        if (!payload.pipeline) {
-            renderCards({});
-            return;
-        }
         const pipelineFilter = payload.pipeline;
 
         $.post(OptimizeKommoDashboard.ajaxUrl, payload, function (resp) {
             if (!resp.success) return;
             renderFilterOptions(resp.data.filter_options || {}, payload);
+
+            if (!payload.pipeline) {
+                renderCards({});
+                renderTable([], pipelineFilter);
+                return;
+            }
 
             renderCards(resp.data.cards || {});
             renderMetricsDebug(resp.data.metricsDebug || {});

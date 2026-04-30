@@ -441,7 +441,6 @@ class Optimize_Kommo_Dashboard
         $base_sql = "FROM {$table} WHERE {$where_sql}";
         return $wpdb->get_results(
             self::prepare_query(
-                "SELECT lead_name, created_at, responsible_user, pipeline_name, status_name, bu, origem, faixa_faturamento, link_relatorio, loss_reason_name, non_advance_category, meeting_scheduled_at, time_to_meeting_minutes, time_to_meeting_source {$base_sql} ORDER BY created_at DESC",
                 "SELECT lead_name, created_at, responsible_user, pipeline_name, status_name, tags, bu, origem, faixa_faturamento, link_relatorio, loss_reason_name, non_advance_category, meeting_scheduled_at, time_to_meeting_minutes, time_to_meeting_source {$base_sql} ORDER BY created_at DESC",
                 $params
             ),
