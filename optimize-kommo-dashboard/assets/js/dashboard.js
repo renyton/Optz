@@ -241,19 +241,12 @@
             cardHtml('Total de leads', cards.total, 'Leads retornados com os filtros aplicados'),
             cardHtml('Leads no período', cards.periodo, 'Resultado conforme filtros aplicados'),
             cardHtml('Leads qualificados', cards.qualificados, 'Leads com perfil qualificado'),
-            cardHtml('Faturamento 1M-20M', cards.faixa_1_20, 'Leads no intervalo'),
-            cardHtml('Faturamento 20M-50M', cards.faixa_20_50, 'Leads no intervalo'),
-            cardHtml('Faturamento 50M-100M', cards.faixa_50_100, 'Leads no intervalo'),
-            cardHtml('Acima de R$ 20M/ano', cards.acima_20m, 'Leads com faturamento estimado acima de 20M'),
             cardHtml('Leads desqualificados', cards.desqualificados, 'Final de funil + tag desqualificado'),
+        ];
+        const qualityItems = [
             cardHtml('Reuniões agendadas', cards.agendados, 'Status com reunião marcada'),
             cardHtml('Taxa de conversão', conversion, 'Reuniões / Leads no período'),
             cardHtml('Roteamentos por BU', cards.roteamentos_bu_total, 'Soma de direcionamentos por tags'),
-            cardHtml('Base de recuperação', cards.base_recuperacao, 'Leads perdidos com potencial de retomada'),
-            cardHtml('Não avançaram sem motivo', cards.sem_motivo_identificado, 'Sem causa identificada no CRM'),
-        ];
-        const qualityItems = [
-            cardHtml('Status do funil', cards.pipeline_ativo || 'Nenhum funil selecionado', 'Filtro obrigatório'),
         ];
         if (main.length && quality.length) {
             main.html(mainItems.join(''));

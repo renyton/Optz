@@ -41,12 +41,18 @@
     justify-content: flex-end;
     align-items: center;
     grid-column: 1 / -1;
-    margin-top: 4px;
+    margin-top: 92px;
 }
 
 .okd-dashboard-header {
     padding: 14px 18px;
     border-bottom: 1px solid var(--okd-border);
+}
+.okd-header-fixed {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    grid-column: 1 / -1;
 }
 
 .okd-brand {
@@ -117,11 +123,13 @@
 
 .okd-filters-bar {
     display: grid;
-    grid-template-columns: repeat(5, minmax(140px, 1fr));
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: var(--okd-space-3);
     padding: var(--okd-space-3);
     align-items: end;
 }
+.okd-filters-bar .okd-filter { grid-column: span 2; }
+.okd-filters-bar .okd-btn-primary { grid-column: span 2; }
 
 .okd-filter {
     display: flex;
@@ -180,8 +188,10 @@
     margin: 0 0 10px;
     font-size: 16px;
 }
-.okd-cards-main .okd-card { grid-column: span 3; }
-.okd-cards-quality .okd-card { grid-column: span 4; }
+.okd-kpi-primary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.okd-kpi-primary .okd-card { grid-column: span 1; min-height: 164px; }
+.okd-kpi-secondary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.okd-kpi-secondary .okd-card { grid-column: span 1; min-height: 140px; }
 .okd-chart-funnel { grid-column: span 12; }
 .okd-debug-toggle-wrap { grid-column: 1 / -1; text-align: right; }
 .okd-debug-metrics { grid-column: 1 / -1; display: none; }
@@ -193,15 +203,21 @@
 .okd-cards .okd-card { min-height: 140px; }
 
 @media (max-width: 1200px) {
-    .okd-cards-main .okd-card,
-    .okd-cards-quality .okd-card,
+    .okd-kpi-primary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .okd-kpi-secondary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .okd-chart-card { grid-column: span 6; }
+    .okd-filters-bar .okd-filter,
+    .okd-filters-bar .okd-btn-primary { grid-column: span 3; }
 }
 @media (max-width: 840px) {
     #optimize-kommo-dashboard { grid-template-columns: 1fr; }
-    .okd-cards-main .okd-card,
-    .okd-cards-quality .okd-card,
+    .okd-kpi-primary,
+    .okd-kpi-secondary { grid-template-columns: 1fr; }
+    .okd-kpi-primary .okd-card,
+    .okd-kpi-secondary .okd-card,
     .okd-chart-card { grid-column: span 12; }
+    .okd-filters-bar .okd-filter,
+    .okd-filters-bar .okd-btn-primary { grid-column: span 12; }
 }
 
 .okd-card {
