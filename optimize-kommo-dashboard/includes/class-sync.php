@@ -90,6 +90,8 @@ class Optimize_Kommo_Sync
             'leads_with_loss_reason_id' => 0,
             'leads_nao_avancou_total' => 0,
             'leads_nao_avancou_without_loss_reason_id' => 0,
+            'leads_with_tags' => 0,
+            'leads_without_tags' => 0,
             'oauth_scope_hint' => '',
         ];
 
@@ -119,6 +121,11 @@ class Optimize_Kommo_Sync
 
                 if (! empty($normalized['loss_reason_id'])) {
                     $sync_debug['leads_with_loss_reason_id']++;
+                }
+                if (! empty($normalized['tags']) && '[]' !== (string) $normalized['tags']) {
+                    $sync_debug['leads_with_tags']++;
+                } else {
+                    $sync_debug['leads_without_tags']++;
                 }
 
                 if ('NÃO AVANÇOU' === mb_strtoupper((string) ($normalized['status_name'] ?? ''), 'UTF-8')) {

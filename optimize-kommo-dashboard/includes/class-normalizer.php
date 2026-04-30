@@ -76,6 +76,9 @@ class Optimize_Kommo_Normalizer
     private static function extract_tags(array $lead)
     {
         $tags = $lead['_embedded']['tags'] ?? [];
+        if (empty($tags) && ! empty($lead['tags']) && is_array($lead['tags'])) {
+            $tags = $lead['tags'];
+        }
 
         return array_values(
             array_filter(
